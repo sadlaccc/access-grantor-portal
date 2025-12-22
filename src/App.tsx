@@ -11,6 +11,9 @@ import Directory from "./pages/Directory";
 import Reports from "./pages/Reports";
 import Knowledge from "./pages/Knowledge";
 import Admin from "./pages/Admin";
+import HRM from "./pages/HRM";
+import CRM from "./pages/CRM";
+import Collaboration from "./pages/Collaboration";
 import NotFound from "./pages/NotFound";
 
 const queryClient = new QueryClient();
@@ -29,6 +32,9 @@ const App = () => (
           <Route path="/directory" element={<Directory />} />
           <Route path="/reports" element={<Reports />} />
           <Route path="/knowledge" element={<Knowledge />} />
+          <Route path="/hrm" element={<HRM />} />
+          <Route path="/crm" element={<CRM />} />
+          <Route path="/collaboration" element={<Collaboration />} />
           <Route path="/admin" element={<Admin />} />
           <Route path="*" element={<NotFound />} />
         </Routes>

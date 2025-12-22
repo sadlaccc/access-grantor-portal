@@ -13,6 +13,9 @@ import {
   ChevronLeft,
   ChevronRight,
   LogOut,
+  UserCog,
+  Handshake,
+  MessageCircle,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
@@ -25,6 +28,9 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
   BarChart3,
   BookOpen,
+  UserCog,
+  Handshake,
+  MessageCircle,
 };
 
 export function Sidebar() {
