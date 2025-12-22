@@ -396,6 +396,10 @@ export type Database = {
           id: string
           job_title: string | null
           phone: string | null
+          show_department: boolean | null
+          show_email: boolean | null
+          show_job_title: boolean | null
+          show_phone: boolean | null
           updated_at: string | null
         }
         Insert: {
@@ -408,6 +412,10 @@ export type Database = {
           id: string
           job_title?: string | null
           phone?: string | null
+          show_department?: boolean | null
+          show_email?: boolean | null
+          show_job_title?: boolean | null
+          show_phone?: boolean | null
           updated_at?: string | null
         }
         Update: {
@@ -420,6 +428,10 @@ export type Database = {
           id?: string
           job_title?: string | null
           phone?: string | null
+          show_department?: boolean | null
+          show_email?: boolean | null
+          show_job_title?: boolean | null
+          show_phone?: boolean | null
           updated_at?: string | null
         }
         Relationships: []
@@ -479,6 +491,13 @@ export type Database = {
       [_ in never]: never
     }
     Functions: {
+      get_visible_profile_data: {
+        Args: {
+          profile_row: Database["public"]["Tables"]["profiles"]["Row"]
+          requesting_user_id: string
+        }
+        Returns: Json
+      }
       has_role: {
         Args: {
           _role: Database["public"]["Enums"]["app_role"]
