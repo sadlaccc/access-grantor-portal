@@ -7,9 +7,13 @@ import {
   BarChart3,
   BookOpen,
   ArrowRight,
+  UserCog,
+  Handshake,
+  MessageCircle,
+  Package,
+  DollarSign,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { App } from '@/types';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Headphones,
@@ -18,10 +22,23 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Users,
   BarChart3,
   BookOpen,
+  UserCog,
+  Handshake,
+  MessageCircle,
+  Package,
+  DollarSign,
 };
 
 interface AppCardProps {
-  app: App;
+  app: {
+    id: string;
+    name: string;
+    description: string | null;
+    icon: string;
+    color: string;
+    route: string;
+    category: string;
+  };
   index: number;
 }
 

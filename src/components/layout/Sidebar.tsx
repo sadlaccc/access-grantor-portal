@@ -16,10 +16,14 @@ import {
   UserCog,
   Handshake,
   MessageCircle,
+  Package,
+  DollarSign,
+  Loader2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
-import { currentUser, apps } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
+import { useApps } from '@/hooks/useApps';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Headphones,
@@ -31,14 +35,26 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UserCog,
   Handshake,
   MessageCircle,
+  Package,
+  DollarSign,
 };
 
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
+  const { user, profile, isAdmin, signOut, loading: authLoading } = useAuth();
+  const { data: apps = [], isLoading: appsLoading } = useApps();
 
-  const userApps = apps.filter((app) => currentUser.assignedApps.includes(app.id));
-  const isAdmin = currentUser.role === 'admin';
+  const handleSignOut = async () => {
+    await signOut();
+  };
+
+  const userInitials = profile?.full_name
+    ?.split(' ')
+    .map((n) => n[0])
+    .join('') || user?.email?.[0]?.toUpperCase() || '?';
+
+  const isLoading = authLoading || appsLoading;
 
   return (
     <aside
@@ -55,7 +71,7 @@ export function Sidebar() {
               <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
                 <Shield className="h-5 w-5 text-primary-foreground" />
               </div>
-              <span className="font-display font-bold text-sidebar-foreground">ITPortal</span>
+              <span className="font-display font-bold text-sidebar-foreground">Intellinks</span>
             </div>
           )}
           <Button
@@ -69,7 +85,7 @@ export function Sidebar() {
         </div>
 
         {/* Navigation */}
-        <nav className="flex-1 space-y-1 p-3">
+        <nav className="flex-1 space-y-1 p-3 overflow-y-auto">
           <Link
             to="/"
             className={cn(
@@ -91,24 +107,30 @@ export function Sidebar() {
             </div>
           )}
 
-          {userApps.map((app) => {
-            const Icon = iconMap[app.icon] || Monitor;
-            return (
-              <Link
-                key={app.id}
-                to={app.route}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
-                  location.pathname === app.route
-                    ? 'bg-sidebar-primary text-sidebar-primary-foreground'
-                    : 'text-sidebar-foreground hover:bg-sidebar-accent'
-                )}
-              >
-                <Icon className="h-5 w-5 shrink-0" />
-                {!collapsed && <span>{app.name}</span>}
-              </Link>
-            );
-          })}
+          {isLoading ? (
+            <div className="flex items-center justify-center py-4">
+              <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+            </div>
+          ) : (
+            apps.map((app) => {
+              const Icon = iconMap[app.icon] || Monitor;
+              return (
+                <Link
+                  key={app.id}
+                  to={app.route}
+                  className={cn(
+                    'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-all duration-200',
+                    location.pathname === app.route
+                      ? 'bg-sidebar-primary text-sidebar-primary-foreground'
+                      : 'text-sidebar-foreground hover:bg-sidebar-accent'
+                  )}
+                >
+                  <Icon className="h-5 w-5 shrink-0" />
+                  {!collapsed && <span>{app.name}</span>}
+                </Link>
+              );
+            })
+          )}
 
           {isAdmin && (
             <>
@@ -144,21 +166,25 @@ export function Sidebar() {
             )}
           >
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full bg-sidebar-accent text-sm font-semibold text-sidebar-foreground">
-              {currentUser.name
-                .split(' ')
-                .map((n) => n[0])
-                .join('')}
+              {userInitials}
             </div>
             {!collapsed && (
               <div className="flex-1 overflow-hidden">
                 <p className="truncate text-sm font-medium text-sidebar-foreground">
-                  {currentUser.name}
+                  {profile?.full_name || user?.email}
                 </p>
-                <p className="truncate text-xs text-muted-foreground">{currentUser.role}</p>
+                <p className="truncate text-xs text-muted-foreground">
+                  {isAdmin ? 'Admin' : 'User'}
+                </p>
               </div>
             )}
             {!collapsed && (
-              <Button variant="ghost" size="icon" className="text-sidebar-foreground hover:bg-sidebar-accent">
+              <Button
+                variant="ghost"
+                size="icon"
+                className="text-sidebar-foreground hover:bg-sidebar-accent"
+                onClick={handleSignOut}
+              >
                 <LogOut className="h-4 w-4" />
               </Button>
             )}

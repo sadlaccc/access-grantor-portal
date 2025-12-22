@@ -114,10 +114,10 @@ const Inventory = () => {
         .from('inventory_orders')
         .insert({
           order_number: orderNumber,
-          supplier_name: orderSupplier,
+          vendor_customer: orderSupplier,
+          order_type: 'purchase',
           status: 'pending',
           total_amount: totalAmount,
-          order_date: new Date().toISOString(),
           created_by: user?.id,
         })
         .select()
@@ -176,7 +176,7 @@ const Inventory = () => {
             if (product) {
               await supabase
                 .from('inventory_products')
-                .update({ quantity: product.quantity + item.quantity })
+                .update({ quantity_in_stock: product.quantity_in_stock + item.quantity })
                 .eq('id', item.product_id);
             }
           }
@@ -206,7 +206,7 @@ const Inventory = () => {
       sku: productSku,
       description: null,
       category: productCategory || null,
-      quantity: parseInt(productQuantity) || 0,
+      quantity_in_stock: parseInt(productQuantity) || 0,
       unit_price: parseFloat(productPrice) || 0,
       reorder_level: parseInt(productReorderLevel) || 10,
     });
@@ -217,8 +217,8 @@ const Inventory = () => {
     p.sku.toLowerCase().includes(searchQuery.toLowerCase())
   );
 
-  const lowStockProducts = products.filter(p => p.quantity <= p.reorder_level);
-  const totalValue = products.reduce((sum, p) => sum + p.quantity * p.unit_price, 0);
+  const lowStockProducts = products.filter(p => p.quantity_in_stock <= p.reorder_level);
+  const totalValue = products.reduce((sum, p) => sum + p.quantity_in_stock * p.unit_price, 0);
   const pendingOrders = orders.filter(o => o.status === 'pending').length;
 
   if (productsLoading || ordersLoading) {
@@ -455,10 +455,10 @@ const Inventory = () => {
                         <TableCell className="font-medium">{product.name}</TableCell>
                         <TableCell>{product.sku}</TableCell>
                         <TableCell>{product.category || '-'}</TableCell>
-                        <TableCell className="text-right">{product.quantity}</TableCell>
+                        <TableCell className="text-right">{product.quantity_in_stock}</TableCell>
                         <TableCell className="text-right">KES {product.unit_price.toLocaleString()}</TableCell>
                         <TableCell>
-                          {product.quantity <= product.reorder_level ? (
+                          {product.quantity_in_stock <= product.reorder_level ? (
                             <Badge variant="destructive" className="flex w-fit items-center gap-1">
                               <TrendingDown className="h-3 w-3" />
                               Low Stock
@@ -496,8 +496,8 @@ const Inventory = () => {
                     {orders.map(order => (
                       <TableRow key={order.id}>
                         <TableCell className="font-medium">{order.order_number}</TableCell>
-                        <TableCell>{order.supplier_name || '-'}</TableCell>
-                        <TableCell>{new Date(order.order_date).toLocaleDateString()}</TableCell>
+                        <TableCell>{order.vendor_customer || '-'}</TableCell>
+                        <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">KES {order.total_amount.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={
@@ -554,10 +554,10 @@ const Inventory = () => {
                         <TableRow key={product.id}>
                           <TableCell className="font-medium">{product.name}</TableCell>
                           <TableCell>{product.sku}</TableCell>
-                          <TableCell className="text-right text-destructive font-semibold">{product.quantity}</TableCell>
+                          <TableCell className="text-right text-destructive font-semibold">{product.quantity_in_stock}</TableCell>
                           <TableCell className="text-right">{product.reorder_level}</TableCell>
                           <TableCell className="text-right text-destructive">
-                            {product.reorder_level - product.quantity}
+                            {product.reorder_level - product.quantity_in_stock}
                           </TableCell>
                         </TableRow>
                       ))}
