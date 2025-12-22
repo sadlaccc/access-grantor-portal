@@ -1,3 +1,4 @@
+import * as React from 'react';
 import { Navigate } from 'react-router-dom';
 import { Loader2 } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
@@ -7,24 +8,28 @@ interface ProtectedRouteProps {
   requireAdmin?: boolean;
 }
 
-export function ProtectedRoute({ children, requireAdmin = false }: ProtectedRouteProps) {
-  const { user, isAdmin, loading } = useAuth();
+export const ProtectedRoute = React.forwardRef<HTMLDivElement, ProtectedRouteProps>(
+  ({ children, requireAdmin = false }, ref) => {
+    const { user, isAdmin, loading } = useAuth();
 
-  if (loading) {
-    return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <Loader2 className="h-8 w-8 animate-spin text-primary" />
-      </div>
-    );
+    if (loading) {
+      return (
+        <div ref={ref} className="flex min-h-screen items-center justify-center bg-background">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      );
+    }
+
+    if (!user) {
+      return <Navigate to="/auth" replace />;
+    }
+
+    if (requireAdmin && !isAdmin) {
+      return <Navigate to="/" replace />;
+    }
+
+    return <div ref={ref}>{children}</div>;
   }
+);
 
-  if (!user) {
-    return <Navigate to="/auth" replace />;
-  }
-
-  if (requireAdmin && !isAdmin) {
-    return <Navigate to="/" replace />;
-  }
-
-  return <>{children}</>;
-}
+ProtectedRoute.displayName = 'ProtectedRoute';
