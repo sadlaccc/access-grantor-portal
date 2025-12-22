@@ -14,16 +14,481 @@ export type Database = {
   }
   public: {
     Tables: {
-      [_ in never]: never
+      ai_chat_messages: {
+        Row: {
+          app_context: string | null
+          content: string
+          created_at: string | null
+          id: string
+          role: string
+          user_id: string
+        }
+        Insert: {
+          app_context?: string | null
+          content: string
+          created_at?: string | null
+          id?: string
+          role: string
+          user_id: string
+        }
+        Update: {
+          app_context?: string | null
+          content?: string
+          created_at?: string | null
+          id?: string
+          role?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
+      apps: {
+        Row: {
+          category: string | null
+          color: string | null
+          description: string | null
+          icon: string | null
+          id: string
+          is_active: boolean | null
+          name: string
+          route: string
+        }
+        Insert: {
+          category?: string | null
+          color?: string | null
+          description?: string | null
+          icon?: string | null
+          id: string
+          is_active?: boolean | null
+          name: string
+          route: string
+        }
+        Update: {
+          category?: string | null
+          color?: string | null
+          description?: string | null
+          icon?: string | null
+          id?: string
+          is_active?: boolean | null
+          name?: string
+          route?: string
+        }
+        Relationships: []
+      }
+      budgets: {
+        Row: {
+          allocated_amount: number
+          created_at: string | null
+          created_by: string | null
+          department: string | null
+          end_date: string | null
+          fiscal_year: number | null
+          id: string
+          name: string
+          spent_amount: number | null
+          start_date: string | null
+          status: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          allocated_amount: number
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          end_date?: string | null
+          fiscal_year?: number | null
+          id?: string
+          name: string
+          spent_amount?: number | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          allocated_amount?: number
+          created_at?: string | null
+          created_by?: string | null
+          department?: string | null
+          end_date?: string | null
+          fiscal_year?: number | null
+          id?: string
+          name?: string
+          spent_amount?: number | null
+          start_date?: string | null
+          status?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      expenses: {
+        Row: {
+          amount: number
+          approved_by: string | null
+          category: string
+          created_at: string | null
+          created_by: string | null
+          description: string | null
+          expense_date: string | null
+          expense_number: string
+          id: string
+          payment_method: string | null
+          receipt_url: string | null
+          status: string | null
+          vendor: string | null
+        }
+        Insert: {
+          amount: number
+          approved_by?: string | null
+          category: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expense_date?: string | null
+          expense_number: string
+          id?: string
+          payment_method?: string | null
+          receipt_url?: string | null
+          status?: string | null
+          vendor?: string | null
+        }
+        Update: {
+          amount?: number
+          approved_by?: string | null
+          category?: string
+          created_at?: string | null
+          created_by?: string | null
+          description?: string | null
+          expense_date?: string | null
+          expense_number?: string
+          id?: string
+          payment_method?: string | null
+          receipt_url?: string | null
+          status?: string | null
+          vendor?: string | null
+        }
+        Relationships: []
+      }
+      inventory_order_items: {
+        Row: {
+          id: string
+          order_id: string | null
+          product_id: string | null
+          quantity: number
+          total_price: number | null
+          unit_price: number
+        }
+        Insert: {
+          id?: string
+          order_id?: string | null
+          product_id?: string | null
+          quantity: number
+          total_price?: number | null
+          unit_price: number
+        }
+        Update: {
+          id?: string
+          order_id?: string | null
+          product_id?: string | null
+          quantity?: number
+          total_price?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "inventory_order_items_order_id_fkey"
+            columns: ["order_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_orders"
+            referencedColumns: ["id"]
+          },
+          {
+            foreignKeyName: "inventory_order_items_product_id_fkey"
+            columns: ["product_id"]
+            isOneToOne: false
+            referencedRelation: "inventory_products"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      inventory_orders: {
+        Row: {
+          created_at: string | null
+          created_by: string | null
+          id: string
+          notes: string | null
+          order_number: string
+          order_type: string
+          status: string | null
+          total_amount: number | null
+          updated_at: string | null
+          vendor_customer: string | null
+        }
+        Insert: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_number: string
+          order_type: string
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          vendor_customer?: string | null
+        }
+        Update: {
+          created_at?: string | null
+          created_by?: string | null
+          id?: string
+          notes?: string | null
+          order_number?: string
+          order_type?: string
+          status?: string | null
+          total_amount?: number | null
+          updated_at?: string | null
+          vendor_customer?: string | null
+        }
+        Relationships: []
+      }
+      inventory_products: {
+        Row: {
+          category: string | null
+          cost_price: number | null
+          created_at: string | null
+          description: string | null
+          id: string
+          name: string
+          quantity_in_stock: number | null
+          reorder_level: number | null
+          sku: string
+          supplier: string | null
+          unit_price: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string | null
+          cost_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name: string
+          quantity_in_stock?: number | null
+          reorder_level?: number | null
+          sku: string
+          supplier?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string | null
+          cost_price?: number | null
+          created_at?: string | null
+          description?: string | null
+          id?: string
+          name?: string
+          quantity_in_stock?: number | null
+          reorder_level?: number | null
+          sku?: string
+          supplier?: string | null
+          unit_price?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      invoice_items: {
+        Row: {
+          description: string
+          id: string
+          invoice_id: string | null
+          quantity: number | null
+          total: number | null
+          unit_price: number
+        }
+        Insert: {
+          description: string
+          id?: string
+          invoice_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price: number
+        }
+        Update: {
+          description?: string
+          id?: string
+          invoice_id?: string | null
+          quantity?: number | null
+          total?: number | null
+          unit_price?: number
+        }
+        Relationships: [
+          {
+            foreignKeyName: "invoice_items_invoice_id_fkey"
+            columns: ["invoice_id"]
+            isOneToOne: false
+            referencedRelation: "invoices"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      invoices: {
+        Row: {
+          client_address: string | null
+          client_email: string | null
+          client_name: string
+          created_at: string | null
+          created_by: string | null
+          due_date: string | null
+          id: string
+          invoice_number: string
+          issue_date: string | null
+          notes: string | null
+          status: string | null
+          subtotal: number | null
+          tax_amount: number | null
+          tax_rate: number | null
+          total_amount: number | null
+          updated_at: string | null
+        }
+        Insert: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number: string
+          issue_date?: string | null
+          notes?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Update: {
+          client_address?: string | null
+          client_email?: string | null
+          client_name?: string
+          created_at?: string | null
+          created_by?: string | null
+          due_date?: string | null
+          id?: string
+          invoice_number?: string
+          issue_date?: string | null
+          notes?: string | null
+          status?: string | null
+          subtotal?: number | null
+          tax_amount?: number | null
+          tax_rate?: number | null
+          total_amount?: number | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      profiles: {
+        Row: {
+          ai_enabled: boolean | null
+          avatar_url: string | null
+          created_at: string | null
+          department: string | null
+          email: string
+          full_name: string | null
+          id: string
+          job_title: string | null
+          phone: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          ai_enabled?: boolean | null
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          email: string
+          full_name?: string | null
+          id: string
+          job_title?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          ai_enabled?: boolean | null
+          avatar_url?: string | null
+          created_at?: string | null
+          department?: string | null
+          email?: string
+          full_name?: string | null
+          id?: string
+          job_title?: string | null
+          phone?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
+      user_app_assignments: {
+        Row: {
+          app_id: string
+          assigned_at: string | null
+          assigned_by: string | null
+          id: string
+          user_id: string
+        }
+        Insert: {
+          app_id: string
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          user_id: string
+        }
+        Update: {
+          app_id?: string
+          assigned_at?: string | null
+          assigned_by?: string | null
+          id?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "user_app_assignments_app_id_fkey"
+            columns: ["app_id"]
+            isOneToOne: false
+            referencedRelation: "apps"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      user_roles: {
+        Row: {
+          id: string
+          role: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Insert: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id: string
+        }
+        Update: {
+          id?: string
+          role?: Database["public"]["Enums"]["app_role"]
+          user_id?: string
+        }
+        Relationships: []
+      }
     }
     Views: {
       [_ in never]: never
     }
     Functions: {
-      [_ in never]: never
+      has_role: {
+        Args: {
+          _role: Database["public"]["Enums"]["app_role"]
+          _user_id: string
+        }
+        Returns: boolean
+      }
     }
     Enums: {
-      [_ in never]: never
+      app_role: "admin" | "user"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -150,6 +615,8 @@ export type CompositeTypes<
 
 export const Constants = {
   public: {
-    Enums: {},
+    Enums: {
+      app_role: ["admin", "user"],
+    },
   },
 } as const
