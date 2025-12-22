@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, UserPlus, Edit2, Trash2, Loader2, Shield, ShieldOff } from 'lucide-react';
+import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -16,16 +16,11 @@ import {
   DialogClose,
 } from '@/components/ui/dialog';
 import {
-  AlertDialog,
-  AlertDialogAction,
-  AlertDialogCancel,
-  AlertDialogContent,
-  AlertDialogDescription,
-  AlertDialogFooter,
-  AlertDialogHeader,
-  AlertDialogTitle,
-  AlertDialogTrigger,
-} from '@/components/ui/alert-dialog';
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
@@ -37,6 +32,14 @@ const createUserSchema = z.object({
   full_name: z.string().trim().min(1, 'Name is required').max(100),
   department: z.string().trim().max(50).optional(),
   job_title: z.string().trim().max(50).optional(),
+});
+
+const resetPasswordSchema = z.object({
+  new_password: z.string().min(6, 'Password must be at least 6 characters').max(72),
+  confirm_password: z.string(),
+}).refine((data) => data.new_password === data.confirm_password, {
+  message: "Passwords don't match",
+  path: ["confirm_password"],
 });
 
 interface Profile {
@@ -70,6 +73,8 @@ export default function Admin() {
   const [userApps, setUserApps] = useState<string[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
   const [isEditAppsDialogOpen, setIsEditAppsDialogOpen] = useState(false);
+  const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
+  const [selectedUserForReset, setSelectedUserForReset] = useState<Profile | null>(null);
 
   // New user form state
   const [newUserForm, setNewUserForm] = useState({
@@ -81,6 +86,13 @@ export default function Admin() {
     is_admin: false,
   });
   const [formErrors, setFormErrors] = useState<Record<string, string>>({});
+
+  // Reset password form state
+  const [resetPasswordForm, setResetPasswordForm] = useState({
+    new_password: '',
+    confirm_password: '',
+  });
+  const [resetPasswordErrors, setResetPasswordErrors] = useState<Record<string, string>>({});
 
   // Fetch profiles
   const { data: profiles = [], isLoading: profilesLoading } = useQuery({
@@ -205,6 +217,31 @@ export default function Admin() {
     },
   });
 
+  // Reset password mutation
+  const resetPasswordMutation = useMutation({
+    mutationFn: async ({ userId, newPassword }: { userId: string; newPassword: string }) => {
+      const { data: { session } } = await supabase.auth.getSession();
+      if (!session) throw new Error('Not authenticated');
+
+      const response = await supabase.functions.invoke('admin-reset-password', {
+        body: { user_id: userId, new_password: newPassword },
+      });
+
+      if (response.error) throw new Error(response.error.message);
+      if (response.data?.error) throw new Error(response.data.error);
+      return response.data;
+    },
+    onSuccess: () => {
+      toast.success('Password reset successfully');
+      setIsResetPasswordDialogOpen(false);
+      setResetPasswordForm({ new_password: '', confirm_password: '' });
+      setSelectedUserForReset(null);
+    },
+    onError: (error) => {
+      toast.error('Failed to reset password: ' + error.message);
+    },
+  });
+
   const handleCreateUser = () => {
     setFormErrors({});
     const result = createUserSchema.safeParse(newUserForm);
@@ -217,6 +254,32 @@ export default function Admin() {
       return;
     }
     createUserMutation.mutate(newUserForm);
+  };
+
+  const handleResetPassword = () => {
+    setResetPasswordErrors({});
+    const result = resetPasswordSchema.safeParse(resetPasswordForm);
+    if (!result.success) {
+      const errors: Record<string, string> = {};
+      result.error.errors.forEach((err) => {
+        if (err.path[0]) errors[err.path[0] as string] = err.message;
+      });
+      setResetPasswordErrors(errors);
+      return;
+    }
+    if (selectedUserForReset) {
+      resetPasswordMutation.mutate({
+        userId: selectedUserForReset.id,
+        newPassword: resetPasswordForm.new_password,
+      });
+    }
+  };
+
+  const openResetPasswordDialog = (profile: Profile) => {
+    setSelectedUserForReset(profile);
+    setResetPasswordForm({ new_password: '', confirm_password: '' });
+    setResetPasswordErrors({});
+    setIsResetPasswordDialogOpen(true);
   };
 
   const handleEditApps = (userId: string) => {
@@ -447,13 +510,23 @@ export default function Admin() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4 text-right">
-                      <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() => handleEditApps(profile.id)}
-                      >
-                        <Edit2 className="h-4 w-4" />
-                      </Button>
+                      <DropdownMenu>
+                        <DropdownMenuTrigger asChild>
+                          <Button variant="ghost" size="sm">
+                            <Settings2 className="h-4 w-4" />
+                          </Button>
+                        </DropdownMenuTrigger>
+                        <DropdownMenuContent align="end">
+                          <DropdownMenuItem onClick={() => handleEditApps(profile.id)}>
+                            <Edit2 className="mr-2 h-4 w-4" />
+                            Edit App Access
+                          </DropdownMenuItem>
+                          <DropdownMenuItem onClick={() => openResetPasswordDialog(profile)}>
+                            <KeyRound className="mr-2 h-4 w-4" />
+                            Reset Password
+                          </DropdownMenuItem>
+                        </DropdownMenuContent>
+                      </DropdownMenu>
                     </td>
                   </tr>
                 ))}
@@ -517,6 +590,61 @@ export default function Admin() {
               >
                 {updateAppsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
+
+        {/* Reset Password Dialog */}
+        <Dialog open={isResetPasswordDialogOpen} onOpenChange={setIsResetPasswordDialogOpen}>
+          <DialogContent className="sm:max-w-md">
+            <DialogHeader>
+              <DialogTitle className="font-display">Reset Password</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4 py-4">
+              <p className="text-sm text-muted-foreground">
+                Reset password for <span className="font-medium text-foreground">{selectedUserForReset?.full_name || selectedUserForReset?.email}</span>
+              </p>
+              <div className="space-y-2">
+                <Label htmlFor="new-password">New Password</Label>
+                <Input
+                  id="new-password"
+                  type="password"
+                  value={resetPasswordForm.new_password}
+                  onChange={(e) => setResetPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
+                  placeholder="Minimum 6 characters"
+                  maxLength={72}
+                />
+                {resetPasswordErrors.new_password && (
+                  <p className="text-xs text-destructive">{resetPasswordErrors.new_password}</p>
+                )}
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="confirm-password">Confirm Password</Label>
+                <Input
+                  id="confirm-password"
+                  type="password"
+                  value={resetPasswordForm.confirm_password}
+                  onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
+                  placeholder="Re-enter password"
+                  maxLength={72}
+                />
+                {resetPasswordErrors.confirm_password && (
+                  <p className="text-xs text-destructive">{resetPasswordErrors.confirm_password}</p>
+                )}
+              </div>
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
+                Cancel
+              </Button>
+              <Button 
+                variant="gradient" 
+                onClick={handleResetPassword}
+                disabled={resetPasswordMutation.isPending}
+              >
+                {resetPasswordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                Reset Password
               </Button>
             </div>
           </DialogContent>
