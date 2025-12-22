@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2 } from 'lucide-react';
+import { useState, useMemo } from 'react';
+import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2, Filter } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -7,6 +7,13 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Switch } from '@/components/ui/switch';
+import {
+  Select,
+  SelectContent,
+  SelectItem,
+  SelectTrigger,
+  SelectValue,
+} from '@/components/ui/select';
 import {
   Dialog,
   DialogContent,
@@ -69,6 +76,7 @@ interface UserAppAssignment {
 export default function Admin() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const [departmentFilter, setDepartmentFilter] = useState<string>('all');
   const [selectedUserId, setSelectedUserId] = useState<string | null>(null);
   const [userApps, setUserApps] = useState<string[]>([]);
   const [isAddDialogOpen, setIsAddDialogOpen] = useState(false);
@@ -311,11 +319,22 @@ export default function Admin() {
     return appAssignments.filter(a => a.user_id === userId).length;
   };
 
-  const filteredProfiles = profiles.filter(
-    (profile) =>
+  // Get unique departments for filter
+  const departments = useMemo(() => {
+    const depts = profiles
+      .map(p => p.department)
+      .filter((d): d is string => !!d);
+    return [...new Set(depts)].sort();
+  }, [profiles]);
+
+  const filteredProfiles = profiles.filter((profile) => {
+    const matchesSearch =
       (profile.full_name?.toLowerCase().includes(searchQuery.toLowerCase()) ?? false) ||
-      profile.email.toLowerCase().includes(searchQuery.toLowerCase())
-  );
+      profile.email.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesDepartment =
+      departmentFilter === 'all' || profile.department === departmentFilter;
+    return matchesSearch && matchesDepartment;
+  });
 
   return (
     <MainLayout>
@@ -433,15 +452,33 @@ export default function Admin() {
           </Dialog>
         </div>
 
-        {/* Search */}
-        <div className="mb-6 relative max-w-md">
-          <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search users..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+        {/* Search and Filter */}
+        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input
+              placeholder="Search users..."
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className="pl-10"
+            />
+          </div>
+          <div className="flex items-center gap-2">
+            <Filter className="h-4 w-4 text-muted-foreground" />
+            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+              <SelectTrigger className="w-[180px]">
+                <SelectValue placeholder="All Departments" />
+              </SelectTrigger>
+              <SelectContent>
+                <SelectItem value="all">All Departments</SelectItem>
+                {departments.map((dept) => (
+                  <SelectItem key={dept} value={dept}>
+                    {dept}
+                  </SelectItem>
+                ))}
+              </SelectContent>
+            </Select>
+          </div>
         </div>
 
         {/* Users Table */}
