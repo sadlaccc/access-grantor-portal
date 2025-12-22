@@ -1,11 +1,12 @@
 import { useState } from 'react';
-import { Plus, Search, Filter } from 'lucide-react';
+import { Plus, Search } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { tickets } from '@/data/mockData';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 const statusColors = {
   open: 'bg-warning/10 text-warning border-warning/20',
@@ -42,7 +43,11 @@ export default function Helpdesk() {
             <h1 className="font-display text-3xl font-bold text-foreground">Helpdesk</h1>
             <p className="mt-1 text-muted-foreground">Manage support tickets and requests</p>
           </div>
-          <Button variant="gradient" className="gap-2">
+          <Button 
+            variant="gradient" 
+            className="gap-2"
+            onClick={() => toast.info('New ticket creation coming soon!')}
+          >
             <Plus className="h-4 w-4" />
             New Ticket
           </Button>
