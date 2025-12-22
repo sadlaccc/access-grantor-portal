@@ -106,7 +106,7 @@ const Finance = () => {
       const { data, error } = await supabase
         .from('expenses')
         .select('*')
-        .order('date', { ascending: false });
+        .order('expense_date', { ascending: false });
       if (error) throw error;
       return data as Expense[];
     },
@@ -119,7 +119,7 @@ const Finance = () => {
       const { data, error } = await supabase
         .from('budgets')
         .select('*')
-        .order('period_start', { ascending: false });
+        .order('start_date', { ascending: false });
       if (error) throw error;
       return data as Budget[];
     },
@@ -183,11 +183,13 @@ const Finance = () => {
   // Create expense mutation
   const createExpenseMutation = useMutation({
     mutationFn: async () => {
+      const expenseNumber = `EXP-${Date.now().toString(36).toUpperCase()}`;
       const { error } = await supabase.from('expenses').insert({
+        expense_number: expenseNumber,
         description: expenseDescription,
         category: expenseCategory,
         amount: parseFloat(expenseAmount),
-        date: expenseDate,
+        expense_date: expenseDate,
         vendor: expenseVendor || null,
         status: 'pending',
         created_by: user?.id,
@@ -205,16 +207,15 @@ const Finance = () => {
     },
   });
 
-  // Create budget mutation
   const createBudgetMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('budgets').insert({
         name: budgetName,
-        category: budgetCategory,
-        amount: parseFloat(budgetAmount),
-        spent: 0,
-        period_start: budgetStart,
-        period_end: budgetEnd,
+        department: budgetCategory,
+        allocated_amount: parseFloat(budgetAmount),
+        spent_amount: 0,
+        start_date: budgetStart,
+        end_date: budgetEnd,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -683,7 +684,7 @@ const Finance = () => {
                         <TableCell className="font-medium max-w-xs truncate">{expense.description}</TableCell>
                         <TableCell className="capitalize">{expense.category}</TableCell>
                         <TableCell>{expense.vendor || '-'}</TableCell>
-                        <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                        <TableCell>{expense.expense_date ? new Date(expense.expense_date).toLocaleDateString() : '-'}</TableCell>
                         <TableCell className="text-right font-semibold">KES {expense.amount.toLocaleString()}</TableCell>
                         <TableCell>
                           <Badge variant={
@@ -730,20 +731,20 @@ const Finance = () => {
               <CardContent>
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
                   {budgets.map(budget => {
-                    const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0;
+                    const percentage = budget.allocated_amount > 0 ? (budget.spent_amount / budget.allocated_amount) * 100 : 0;
                     const isOverBudget = percentage > 100;
                     return (
                       <Card key={budget.id} className="border">
                         <CardContent className="pt-6">
                           <div className="flex items-center justify-between mb-2">
                             <h4 className="font-semibold">{budget.name}</h4>
-                            <Badge variant="outline" className="capitalize">{budget.category}</Badge>
+                            <Badge variant="outline" className="capitalize">{budget.department || 'General'}</Badge>
                           </div>
                           <div className="space-y-2">
                             <div className="flex justify-between text-sm">
                               <span className="text-muted-foreground">Spent</span>
                               <span className={isOverBudget ? 'text-destructive font-semibold' : ''}>
-                                KES {budget.spent.toLocaleString()} / {budget.amount.toLocaleString()}
+                                KES {budget.spent_amount.toLocaleString()} / {budget.allocated_amount.toLocaleString()}
                               </span>
                             </div>
                             <div className="h-2 overflow-hidden rounded-full bg-muted">
@@ -753,8 +754,8 @@ const Finance = () => {
                               />
                             </div>
                             <div className="flex justify-between text-xs text-muted-foreground">
-                              <span>{new Date(budget.period_start).toLocaleDateString()}</span>
-                              <span>{new Date(budget.period_end).toLocaleDateString()}</span>
+                              <span>{new Date(budget.start_date).toLocaleDateString()}</span>
+                              <span>{new Date(budget.end_date).toLocaleDateString()}</span>
                             </div>
                           </div>
                         </CardContent>

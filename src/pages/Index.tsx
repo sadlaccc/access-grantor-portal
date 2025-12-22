@@ -1,15 +1,31 @@
-import { Ticket, FolderKanban, Monitor, Users } from 'lucide-react';
+import { Ticket, FolderKanban, Monitor, Users, Loader2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { AppCard } from '@/components/dashboard/AppCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentTickets } from '@/components/dashboard/RecentTickets';
-import { apps, currentUser, tickets, projects, assets } from '@/data/mockData';
+import { useAuth } from '@/contexts/AuthContext';
+import { useApps } from '@/hooks/useApps';
+import { tickets, projects, assets } from '@/data/mockData';
 
 const Index = () => {
-  const userApps = apps.filter((app) => currentUser.assignedApps.includes(app.id));
+  const { profile } = useAuth();
+  const { data: apps = [], isLoading } = useApps();
+  
   const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in-progress').length;
   const activeProjects = projects.filter((p) => p.status === 'active').length;
   const availableAssets = assets.filter((a) => a.status === 'available').length;
+
+  const firstName = profile?.full_name?.split(' ')[0] || 'User';
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
@@ -17,7 +33,7 @@ const Index = () => {
         {/* Header */}
         <div className="mb-8 animate-fade-in">
           <h1 className="font-display text-3xl font-bold text-foreground">
-            Welcome back, {currentUser.name.split(' ')[0]}
+            Welcome back, {firstName}
           </h1>
           <p className="mt-1 text-muted-foreground">
             Here's what's happening across your workspace today.
@@ -54,11 +70,17 @@ const Index = () => {
         {/* Apps Grid */}
         <div className="mb-8">
           <h2 className="mb-4 font-display text-xl font-semibold text-foreground">Your Apps</h2>
-          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-            {userApps.map((app, index) => (
-              <AppCard key={app.id} app={app} index={index} />
-            ))}
-          </div>
+          {apps.length === 0 ? (
+            <div className="rounded-xl border border-border bg-card p-8 text-center">
+              <p className="text-muted-foreground">No apps assigned yet. Contact your administrator.</p>
+            </div>
+          ) : (
+            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+              {apps.map((app, index) => (
+                <AppCard key={app.id} app={app} index={index} />
+              ))}
+            </div>
+          )}
         </div>
 
         {/* Recent Activity */}
