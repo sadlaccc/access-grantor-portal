@@ -1,4 +1,3 @@
-import * as React from 'react';
 import { useState, useRef, useEffect } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { Bot, Send, X, Loader2, Sparkles, Maximize2, Minimize2 } from 'lucide-react';
@@ -16,8 +15,7 @@ interface Message {
   created_at: string;
 }
 
-export const AIChat = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTMLDivElement>>(
-  (props, ref) => {
+export function AIChat() {
   const { user, profile } = useAuth();
   const [isOpen, setIsOpen] = useState(false);
   const [isExpanded, setIsExpanded] = useState(false);
@@ -231,6 +229,4 @@ export const AIChat = React.forwardRef<HTMLDivElement, React.HTMLAttributes<HTML
       )}
     </>
   );
-});
-
-AIChat.displayName = 'AIChat';
+}
