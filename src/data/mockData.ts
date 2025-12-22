@@ -55,6 +55,33 @@ export const apps: App[] = [
     route: '/knowledge',
     category: 'tools',
   },
+  {
+    id: 'hrm',
+    name: 'HRM',
+    description: 'Human resource management',
+    icon: 'UserCog',
+    color: 'bg-accent',
+    route: '/hrm',
+    category: 'management',
+  },
+  {
+    id: 'crm',
+    name: 'CRM',
+    description: 'Customer relationship management',
+    icon: 'Handshake',
+    color: 'bg-success',
+    route: '/crm',
+    category: 'management',
+  },
+  {
+    id: 'collaboration',
+    name: 'Collaboration',
+    description: 'Team chat, meetings, and file sharing',
+    icon: 'MessageCircle',
+    color: 'bg-warning',
+    route: '/collaboration',
+    category: 'tools',
+  },
 ];
 
 export const users: User[] = [
@@ -64,7 +91,7 @@ export const users: User[] = [
     email: 'john.smith@company.com',
     role: 'admin',
     department: 'IT',
-    assignedApps: ['helpdesk', 'projects', 'assets', 'directory', 'reports', 'knowledge'],
+    assignedApps: ['helpdesk', 'projects', 'assets', 'directory', 'reports', 'knowledge', 'hrm', 'crm', 'collaboration'],
     status: 'active',
   },
   {
