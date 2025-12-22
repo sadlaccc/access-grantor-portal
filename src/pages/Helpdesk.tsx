@@ -91,11 +91,38 @@ export default function Helpdesk() {
     return acc;
   }, {} as Record<string, string>);
 
+  const profileEmailMap = profiles.reduce((acc, p) => {
+    acc[p.id] = p.email;
+    return acc;
+  }, {} as Record<string, string>);
+
+  // Send notification helper
+  const sendNotification = async (payload: {
+    type: 'created' | 'status_changed';
+    ticketNumber: string;
+    ticketTitle: string;
+    ticketDescription?: string;
+    priority?: string;
+    oldStatus?: string;
+    newStatus?: string;
+    creatorEmail?: string;
+    assigneeEmail?: string;
+  }) => {
+    try {
+      await supabase.functions.invoke('send-ticket-notification', {
+        body: payload,
+      });
+      console.log('Notification sent successfully');
+    } catch (error) {
+      console.error('Failed to send notification:', error);
+    }
+  };
+
   // Create ticket mutation
   const createTicketMutation = useMutation({
     mutationFn: async () => {
       const ticketNumber = `TKT-${Date.now().toString(36).toUpperCase()}`;
-      const { error } = await supabase.from('tickets').insert({
+      const { data, error } = await supabase.from('tickets').insert({
         ticket_number: ticketNumber,
         title,
         description: description || null,
@@ -104,13 +131,28 @@ export default function Helpdesk() {
         created_by: user?.id,
         assignee_id: assigneeId,
         department: null,
-      });
+      }).select().single();
       if (error) throw error;
+      return data;
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       toast.success('Ticket created successfully');
       setIsCreateDialogOpen(false);
+      
+      // Send email notification
+      const creatorEmail = user?.id ? profileEmailMap[user.id] : undefined;
+      const assigneeEmail = assigneeId ? profileEmailMap[assigneeId] : undefined;
+      sendNotification({
+        type: 'created',
+        ticketNumber: data.ticket_number,
+        ticketTitle: title,
+        ticketDescription: description || undefined,
+        priority,
+        creatorEmail,
+        assigneeEmail,
+      });
+      
       resetForm();
     },
     onError: (error: Error) => {
@@ -120,16 +162,32 @@ export default function Helpdesk() {
 
   // Update ticket status mutation
   const updateTicketStatusMutation = useMutation({
-    mutationFn: async ({ ticketId, status }: { ticketId: string; status: string }) => {
-      const { error } = await supabase
+    mutationFn: async ({ ticketId, status, oldStatus }: { ticketId: string; status: string; oldStatus: string }) => {
+      const { data, error } = await supabase
         .from('tickets')
         .update({ status })
-        .eq('id', ticketId);
+        .eq('id', ticketId)
+        .select()
+        .single();
       if (error) throw error;
+      return { ...data, oldStatus };
     },
-    onSuccess: () => {
+    onSuccess: (data) => {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       toast.success('Ticket updated');
+      
+      // Send email notification
+      const creatorEmail = data.created_by ? profileEmailMap[data.created_by] : undefined;
+      const assigneeEmail = data.assignee_id ? profileEmailMap[data.assignee_id] : undefined;
+      sendNotification({
+        type: 'status_changed',
+        ticketNumber: data.ticket_number,
+        ticketTitle: data.title,
+        oldStatus: data.oldStatus,
+        newStatus: data.status,
+        creatorEmail,
+        assigneeEmail,
+      });
     },
     onError: (error: Error) => {
       toast.error('Failed to update ticket: ' + error.message);
@@ -346,8 +404,12 @@ export default function Helpdesk() {
                     <td className="px-6 py-4">
                       <Select
                         value={ticket.status}
-                        onValueChange={(status) =>
-                          updateTicketStatusMutation.mutate({ ticketId: ticket.id, status })
+                        onValueChange={(newStatus) =>
+                          updateTicketStatusMutation.mutate({ 
+                            ticketId: ticket.id, 
+                            status: newStatus,
+                            oldStatus: ticket.status 
+                          })
                         }
                       >
                         <SelectTrigger className="w-[130px]">
