@@ -1,0 +1,774 @@
+import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
+import { 
+  DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
+  TrendingUp, TrendingDown, Loader2, Download, Send
+} from 'lucide-react';
+import { MainLayout } from '@/components/layout/MainLayout';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Badge } from '@/components/ui/badge';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Textarea } from '@/components/ui/textarea';
+import { supabase } from '@/integrations/supabase/client';
+import { useToast } from '@/hooks/use-toast';
+import { useAuth } from '@/contexts/AuthContext';
+
+interface Invoice {
+  id: string;
+  invoice_number: string;
+  client_name: string;
+  client_email: string | null;
+  status: string;
+  subtotal: number;
+  tax_rate: number;
+  tax_amount: number;
+  total_amount: number;
+  due_date: string;
+  created_at: string;
+}
+
+interface Expense {
+  id: string;
+  expense_number: string;
+  description: string | null;
+  category: string;
+  amount: number;
+  expense_date: string | null;
+  vendor: string | null;
+  receipt_url: string | null;
+  status: string;
+}
+
+interface Budget {
+  id: string;
+  name: string;
+  department: string | null;
+  allocated_amount: number;
+  spent_amount: number;
+  start_date: string;
+  end_date: string;
+}
+
+const Finance = () => {
+  const { user } = useAuth();
+  const { toast } = useToast();
+  const queryClient = useQueryClient();
+  const [searchQuery, setSearchQuery] = useState('');
+  const [isInvoiceDialogOpen, setIsInvoiceDialogOpen] = useState(false);
+  const [isExpenseDialogOpen, setIsExpenseDialogOpen] = useState(false);
+  const [isBudgetDialogOpen, setIsBudgetDialogOpen] = useState(false);
+
+  // Invoice form state
+  const [invoiceClient, setInvoiceClient] = useState('');
+  const [invoiceEmail, setInvoiceEmail] = useState('');
+  const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  const [invoiceItems, setInvoiceItems] = useState<{ description: string; quantity: number; price: number }[]>([
+    { description: '', quantity: 1, price: 0 }
+  ]);
+
+  // Expense form state
+  const [expenseDescription, setExpenseDescription] = useState('');
+  const [expenseCategory, setExpenseCategory] = useState('');
+  const [expenseAmount, setExpenseAmount] = useState('');
+  const [expenseVendor, setExpenseVendor] = useState('');
+  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+
+  // Budget form state
+  const [budgetName, setBudgetName] = useState('');
+  const [budgetCategory, setBudgetCategory] = useState('');
+  const [budgetAmount, setBudgetAmount] = useState('');
+  const [budgetStart, setBudgetStart] = useState('');
+  const [budgetEnd, setBudgetEnd] = useState('');
+
+  // Fetch invoices
+  const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
+    queryKey: ['invoices'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('invoices')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as Invoice[];
+    },
+  });
+
+  // Fetch expenses
+  const { data: expenses = [], isLoading: expensesLoading } = useQuery({
+    queryKey: ['expenses'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('expenses')
+        .select('*')
+        .order('date', { ascending: false });
+      if (error) throw error;
+      return data as Expense[];
+    },
+  });
+
+  // Fetch budgets
+  const { data: budgets = [], isLoading: budgetsLoading } = useQuery({
+    queryKey: ['budgets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('budgets')
+        .select('*')
+        .order('period_start', { ascending: false });
+      if (error) throw error;
+      return data as Budget[];
+    },
+  });
+
+  // Create invoice mutation
+  const createInvoiceMutation = useMutation({
+    mutationFn: async () => {
+      const invoiceNumber = `INV-${Date.now().toString(36).toUpperCase()}`;
+      const subtotal = invoiceItems.reduce((sum, item) => sum + item.quantity * item.price, 0);
+      const taxRate = 16; // 16% VAT
+      const taxAmount = subtotal * (taxRate / 100);
+      const totalAmount = subtotal + taxAmount;
+
+      const { data: invoice, error: invoiceError } = await supabase
+        .from('invoices')
+        .insert({
+          invoice_number: invoiceNumber,
+          client_name: invoiceClient,
+          client_email: invoiceEmail || null,
+          status: 'draft',
+          subtotal,
+          tax_rate: taxRate,
+          tax_amount: taxAmount,
+          total_amount: totalAmount,
+          due_date: invoiceDueDate,
+          created_by: user?.id,
+        })
+        .select()
+        .single();
+
+      if (invoiceError) throw invoiceError;
+
+      // Add invoice items
+      const items = invoiceItems.filter(i => i.description).map(item => ({
+        invoice_id: invoice.id,
+        description: item.description,
+        quantity: item.quantity,
+        unit_price: item.price,
+        total: item.quantity * item.price,
+      }));
+
+      if (items.length > 0) {
+        const { error: itemsError } = await supabase
+          .from('invoice_items')
+          .insert(items);
+        if (itemsError) throw itemsError;
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({ title: 'Invoice created successfully' });
+      setIsInvoiceDialogOpen(false);
+      resetInvoiceForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to create invoice', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Create expense mutation
+  const createExpenseMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('expenses').insert({
+        description: expenseDescription,
+        category: expenseCategory,
+        amount: parseFloat(expenseAmount),
+        date: expenseDate,
+        vendor: expenseVendor || null,
+        status: 'pending',
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({ title: 'Expense recorded successfully' });
+      setIsExpenseDialogOpen(false);
+      resetExpenseForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to record expense', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Create budget mutation
+  const createBudgetMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('budgets').insert({
+        name: budgetName,
+        category: budgetCategory,
+        amount: parseFloat(budgetAmount),
+        spent: 0,
+        period_start: budgetStart,
+        period_end: budgetEnd,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['budgets'] });
+      toast({ title: 'Budget created successfully' });
+      setIsBudgetDialogOpen(false);
+      resetBudgetForm();
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to create budget', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Update invoice status mutation
+  const updateInvoiceStatusMutation = useMutation({
+    mutationFn: async ({ invoiceId, status }: { invoiceId: string; status: string }) => {
+      const { error } = await supabase
+        .from('invoices')
+        .update({ status })
+        .eq('id', invoiceId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['invoices'] });
+      toast({ title: 'Invoice status updated' });
+    },
+  });
+
+  // Approve expense mutation
+  const approveExpenseMutation = useMutation({
+    mutationFn: async ({ expenseId, status }: { expenseId: string; status: string }) => {
+      const { error } = await supabase
+        .from('expenses')
+        .update({ status })
+        .eq('id', expenseId);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['expenses'] });
+      toast({ title: 'Expense updated' });
+    },
+  });
+
+  const resetInvoiceForm = () => {
+    setInvoiceClient('');
+    setInvoiceEmail('');
+    setInvoiceDueDate('');
+    setInvoiceItems([{ description: '', quantity: 1, price: 0 }]);
+  };
+
+  const resetExpenseForm = () => {
+    setExpenseDescription('');
+    setExpenseCategory('');
+    setExpenseAmount('');
+    setExpenseVendor('');
+    setExpenseDate(new Date().toISOString().split('T')[0]);
+  };
+
+  const resetBudgetForm = () => {
+    setBudgetName('');
+    setBudgetCategory('');
+    setBudgetAmount('');
+    setBudgetStart('');
+    setBudgetEnd('');
+  };
+
+  const addInvoiceItem = () => {
+    setInvoiceItems([...invoiceItems, { description: '', quantity: 1, price: 0 }]);
+  };
+
+  const totalRevenue = invoices.filter(i => i.status === 'paid').reduce((sum, i) => sum + i.total_amount, 0);
+  const pendingInvoices = invoices.filter(i => i.status === 'sent').reduce((sum, i) => sum + i.total_amount, 0);
+  const totalExpenses = expenses.filter(e => e.status === 'approved').reduce((sum, e) => sum + e.amount, 0);
+  const netProfit = totalRevenue - totalExpenses;
+
+  const isLoading = invoicesLoading || expensesLoading || budgetsLoading;
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
+
+  return (
+    <MainLayout>
+      <div className="p-8">
+        <div className="mb-8 flex items-center justify-between animate-fade-in">
+          <div>
+            <h1 className="font-display text-3xl font-bold text-foreground">Finance & Accounting</h1>
+            <p className="mt-1 text-muted-foreground">Manage invoices, expenses, and budgets</p>
+          </div>
+        </div>
+
+        {/* Stats */}
+        <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Revenue</p>
+                  <p className="text-2xl font-bold text-success">KES {totalRevenue.toLocaleString()}</p>
+                </div>
+                <TrendingUp className="h-8 w-8 text-success" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Pending Invoices</p>
+                  <p className="text-2xl font-bold text-warning">KES {pendingInvoices.toLocaleString()}</p>
+                </div>
+                <FileText className="h-8 w-8 text-warning" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Total Expenses</p>
+                  <p className="text-2xl font-bold text-destructive">KES {totalExpenses.toLocaleString()}</p>
+                </div>
+                <TrendingDown className="h-8 w-8 text-destructive" />
+              </div>
+            </CardContent>
+          </Card>
+          <Card>
+            <CardContent className="pt-6">
+              <div className="flex items-center justify-between">
+                <div>
+                  <p className="text-sm text-muted-foreground">Net Profit</p>
+                  <p className={`text-2xl font-bold ${netProfit >= 0 ? 'text-success' : 'text-destructive'}`}>
+                    KES {netProfit.toLocaleString()}
+                  </p>
+                </div>
+                <DollarSign className="h-8 w-8 text-primary" />
+              </div>
+            </CardContent>
+          </Card>
+        </div>
+
+        <Tabs defaultValue="invoices" className="space-y-4">
+          <div className="flex items-center justify-between">
+            <TabsList>
+              <TabsTrigger value="invoices">Invoices</TabsTrigger>
+              <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="budgets">Budgets</TabsTrigger>
+            </TabsList>
+            <div className="flex gap-2">
+              <Dialog open={isInvoiceDialogOpen} onOpenChange={setIsInvoiceDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button className="gradient-primary">
+                    <Plus className="mr-2 h-4 w-4" />
+                    New Invoice
+                  </Button>
+                </DialogTrigger>
+                <DialogContent className="max-w-2xl">
+                  <DialogHeader>
+                    <DialogTitle>Create Invoice</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Client Name</Label>
+                        <Input value={invoiceClient} onChange={e => setInvoiceClient(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Client Email</Label>
+                        <Input type="email" value={invoiceEmail} onChange={e => setInvoiceEmail(e.target.value)} />
+                      </div>
+                    </div>
+                    <div className="space-y-2">
+                      <Label>Due Date</Label>
+                      <Input type="date" value={invoiceDueDate} onChange={e => setInvoiceDueDate(e.target.value)} required />
+                    </div>
+                    <div className="space-y-2">
+                      <div className="flex items-center justify-between">
+                        <Label>Line Items</Label>
+                        <Button type="button" variant="outline" size="sm" onClick={addInvoiceItem}>
+                          Add Item
+                        </Button>
+                      </div>
+                      {invoiceItems.map((item, idx) => (
+                        <div key={idx} className="grid grid-cols-6 gap-2">
+                          <div className="col-span-3">
+                            <Input
+                              placeholder="Description"
+                              value={item.description}
+                              onChange={e => {
+                                const items = [...invoiceItems];
+                                items[idx].description = e.target.value;
+                                setInvoiceItems(items);
+                              }}
+                            />
+                          </div>
+                          <Input
+                            type="number"
+                            placeholder="Qty"
+                            value={item.quantity}
+                            onChange={e => {
+                              const items = [...invoiceItems];
+                              items[idx].quantity = parseInt(e.target.value) || 1;
+                              setInvoiceItems(items);
+                            }}
+                          />
+                          <Input
+                            type="number"
+                            placeholder="Price"
+                            value={item.price}
+                            onChange={e => {
+                              const items = [...invoiceItems];
+                              items[idx].price = parseFloat(e.target.value) || 0;
+                              setInvoiceItems(items);
+                            }}
+                          />
+                          <div className="flex items-center justify-center font-medium">
+                            KES {(item.quantity * item.price).toLocaleString()}
+                          </div>
+                        </div>
+                      ))}
+                      <div className="mt-4 border-t pt-4">
+                        <div className="flex justify-between text-sm">
+                          <span>Subtotal</span>
+                          <span>KES {invoiceItems.reduce((sum, i) => sum + i.quantity * i.price, 0).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between text-sm text-muted-foreground">
+                          <span>VAT (16%)</span>
+                          <span>KES {(invoiceItems.reduce((sum, i) => sum + i.quantity * i.price, 0) * 0.16).toLocaleString()}</span>
+                        </div>
+                        <div className="flex justify-between font-bold mt-2">
+                          <span>Total</span>
+                          <span>KES {(invoiceItems.reduce((sum, i) => sum + i.quantity * i.price, 0) * 1.16).toLocaleString()}</span>
+                        </div>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => createInvoiceMutation.mutate()}
+                      className="w-full gradient-primary"
+                      disabled={!invoiceClient || !invoiceDueDate || createInvoiceMutation.isPending}
+                    >
+                      {createInvoiceMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Create Invoice
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isExpenseDialogOpen} onOpenChange={setIsExpenseDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <Receipt className="mr-2 h-4 w-4" />
+                    Record Expense
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Record Expense</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Description</Label>
+                      <Textarea value={expenseDescription} onChange={e => setExpenseDescription(e.target.value)} required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={expenseCategory} onValueChange={setExpenseCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="office">Office Supplies</SelectItem>
+                            <SelectItem value="travel">Travel</SelectItem>
+                            <SelectItem value="software">Software</SelectItem>
+                            <SelectItem value="utilities">Utilities</SelectItem>
+                            <SelectItem value="salaries">Salaries</SelectItem>
+                            <SelectItem value="marketing">Marketing</SelectItem>
+                            <SelectItem value="other">Other</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount (KES)</Label>
+                        <Input type="number" value={expenseAmount} onChange={e => setExpenseAmount(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Vendor</Label>
+                        <Input value={expenseVendor} onChange={e => setExpenseVendor(e.target.value)} />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Date</Label>
+                        <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => createExpenseMutation.mutate()}
+                      className="w-full gradient-primary"
+                      disabled={!expenseDescription || !expenseCategory || !expenseAmount || createExpenseMutation.isPending}
+                    >
+                      {createExpenseMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Record Expense
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+
+              <Dialog open={isBudgetDialogOpen} onOpenChange={setIsBudgetDialogOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline">
+                    <PiggyBank className="mr-2 h-4 w-4" />
+                    New Budget
+                  </Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader>
+                    <DialogTitle>Create Budget</DialogTitle>
+                  </DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2">
+                      <Label>Budget Name</Label>
+                      <Input value={budgetName} onChange={e => setBudgetName(e.target.value)} required />
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Category</Label>
+                        <Select value={budgetCategory} onValueChange={setBudgetCategory}>
+                          <SelectTrigger>
+                            <SelectValue placeholder="Select category" />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="operations">Operations</SelectItem>
+                            <SelectItem value="marketing">Marketing</SelectItem>
+                            <SelectItem value="development">Development</SelectItem>
+                            <SelectItem value="hr">Human Resources</SelectItem>
+                            <SelectItem value="it">IT & Infrastructure</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Amount (KES)</Label>
+                        <Input type="number" value={budgetAmount} onChange={e => setBudgetAmount(e.target.value)} required />
+                      </div>
+                    </div>
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <Label>Period Start</Label>
+                        <Input type="date" value={budgetStart} onChange={e => setBudgetStart(e.target.value)} required />
+                      </div>
+                      <div className="space-y-2">
+                        <Label>Period End</Label>
+                        <Input type="date" value={budgetEnd} onChange={e => setBudgetEnd(e.target.value)} required />
+                      </div>
+                    </div>
+                    <Button
+                      onClick={() => createBudgetMutation.mutate()}
+                      className="w-full gradient-primary"
+                      disabled={!budgetName || !budgetCategory || !budgetAmount || createBudgetMutation.isPending}
+                    >
+                      {createBudgetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                      Create Budget
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            </div>
+          </div>
+
+          <TabsContent value="invoices">
+            <Card>
+              <CardHeader>
+                <CardTitle>Invoices</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Invoice #</TableHead>
+                      <TableHead>Client</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead>Due Date</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {invoices.map(invoice => (
+                      <TableRow key={invoice.id}>
+                        <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
+                        <TableCell>{invoice.client_name}</TableCell>
+                        <TableCell>{new Date(invoice.created_at).toLocaleDateString()}</TableCell>
+                        <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right font-semibold">KES {invoice.total_amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            invoice.status === 'paid' ? 'default' :
+                            invoice.status === 'sent' ? 'secondary' :
+                            invoice.status === 'overdue' ? 'destructive' :
+                            'outline'
+                          }>
+                            {invoice.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          <div className="flex gap-1">
+                            {invoice.status === 'draft' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateInvoiceStatusMutation.mutate({ invoiceId: invoice.id, status: 'sent' })}
+                              >
+                                <Send className="h-3 w-3 mr-1" />
+                                Send
+                              </Button>
+                            )}
+                            {invoice.status === 'sent' && (
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => updateInvoiceStatusMutation.mutate({ invoiceId: invoice.id, status: 'paid' })}
+                              >
+                                Mark Paid
+                              </Button>
+                            )}
+                          </div>
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="expenses">
+            <Card>
+              <CardHeader>
+                <CardTitle>Expenses</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <Table>
+                  <TableHeader>
+                    <TableRow>
+                      <TableHead>Description</TableHead>
+                      <TableHead>Category</TableHead>
+                      <TableHead>Vendor</TableHead>
+                      <TableHead>Date</TableHead>
+                      <TableHead className="text-right">Amount</TableHead>
+                      <TableHead>Status</TableHead>
+                      <TableHead>Actions</TableHead>
+                    </TableRow>
+                  </TableHeader>
+                  <TableBody>
+                    {expenses.map(expense => (
+                      <TableRow key={expense.id}>
+                        <TableCell className="font-medium max-w-xs truncate">{expense.description}</TableCell>
+                        <TableCell className="capitalize">{expense.category}</TableCell>
+                        <TableCell>{expense.vendor || '-'}</TableCell>
+                        <TableCell>{new Date(expense.date).toLocaleDateString()}</TableCell>
+                        <TableCell className="text-right font-semibold">KES {expense.amount.toLocaleString()}</TableCell>
+                        <TableCell>
+                          <Badge variant={
+                            expense.status === 'approved' ? 'default' :
+                            expense.status === 'rejected' ? 'destructive' :
+                            'secondary'
+                          }>
+                            {expense.status}
+                          </Badge>
+                        </TableCell>
+                        <TableCell>
+                          {expense.status === 'pending' && (
+                            <div className="flex gap-1">
+                              <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => approveExpenseMutation.mutate({ expenseId: expense.id, status: 'approved' })}
+                              >
+                                Approve
+                              </Button>
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => approveExpenseMutation.mutate({ expenseId: expense.id, status: 'rejected' })}
+                              >
+                                Reject
+                              </Button>
+                            </div>
+                          )}
+                        </TableCell>
+                      </TableRow>
+                    ))}
+                  </TableBody>
+                </Table>
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          <TabsContent value="budgets">
+            <Card>
+              <CardHeader>
+                <CardTitle>Budgets</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-3">
+                  {budgets.map(budget => {
+                    const percentage = budget.amount > 0 ? (budget.spent / budget.amount) * 100 : 0;
+                    const isOverBudget = percentage > 100;
+                    return (
+                      <Card key={budget.id} className="border">
+                        <CardContent className="pt-6">
+                          <div className="flex items-center justify-between mb-2">
+                            <h4 className="font-semibold">{budget.name}</h4>
+                            <Badge variant="outline" className="capitalize">{budget.category}</Badge>
+                          </div>
+                          <div className="space-y-2">
+                            <div className="flex justify-between text-sm">
+                              <span className="text-muted-foreground">Spent</span>
+                              <span className={isOverBudget ? 'text-destructive font-semibold' : ''}>
+                                KES {budget.spent.toLocaleString()} / {budget.amount.toLocaleString()}
+                              </span>
+                            </div>
+                            <div className="h-2 overflow-hidden rounded-full bg-muted">
+                              <div
+                                className={`h-full rounded-full transition-all ${isOverBudget ? 'bg-destructive' : 'gradient-primary'}`}
+                                style={{ width: `${Math.min(percentage, 100)}%` }}
+                              />
+                            </div>
+                            <div className="flex justify-between text-xs text-muted-foreground">
+                              <span>{new Date(budget.period_start).toLocaleDateString()}</span>
+                              <span>{new Date(budget.period_end).toLocaleDateString()}</span>
+                            </div>
+                          </div>
+                        </CardContent>
+                      </Card>
+                    );
+                  })}
+                </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
+      </div>
+    </MainLayout>
+  );
+};
+
+export default Finance;
