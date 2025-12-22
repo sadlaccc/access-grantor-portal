@@ -159,9 +159,11 @@ export function Sidebar() {
 
         {/* User */}
         <div className="border-t border-sidebar-border p-3">
-          <div
+          <Link
+            to="/profile"
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2',
+              'flex items-center gap-3 rounded-lg px-3 py-2 transition-all duration-200 hover:bg-sidebar-accent',
+              location.pathname === '/profile' && 'bg-sidebar-accent',
               collapsed && 'justify-center'
             )}
           >
@@ -178,17 +180,18 @@ export function Sidebar() {
                 </p>
               </div>
             )}
-            {!collapsed && (
-              <Button
-                variant="ghost"
-                size="icon"
-                className="text-sidebar-foreground hover:bg-sidebar-accent"
-                onClick={handleSignOut}
-              >
-                <LogOut className="h-4 w-4" />
-              </Button>
-            )}
-          </div>
+          </Link>
+          {!collapsed && (
+            <Button
+              variant="ghost"
+              size="sm"
+              className="w-full justify-start mt-1 text-sidebar-foreground hover:bg-sidebar-accent"
+              onClick={handleSignOut}
+            >
+              <LogOut className="h-4 w-4 mr-2" />
+              Sign Out
+            </Button>
+          )}
         </div>
       </div>
     </aside>
