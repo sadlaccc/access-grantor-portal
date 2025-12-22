@@ -1,17 +1,21 @@
-import { ReactNode } from 'react';
+import * as React from 'react';
 import { Sidebar } from './Sidebar';
 
 interface MainLayoutProps {
-  children: ReactNode;
+  children: React.ReactNode;
 }
 
-export function MainLayout({ children }: MainLayoutProps) {
-  return (
-    <div className="min-h-screen bg-background">
-      <Sidebar />
-      <main className="ml-64 min-h-screen transition-all duration-300">
-        {children}
-      </main>
-    </div>
-  );
-}
+export const MainLayout = React.forwardRef<HTMLDivElement, MainLayoutProps>(
+  ({ children }, ref) => {
+    return (
+      <div ref={ref} className="min-h-screen bg-background">
+        <Sidebar />
+        <main className="ml-64 min-h-screen transition-all duration-300">
+          {children}
+        </main>
+      </div>
+    );
+  }
+);
+
+MainLayout.displayName = 'MainLayout';
