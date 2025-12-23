@@ -109,7 +109,7 @@ export default function Collaboration() {
       <div className="space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">Collaboration</h1>
+            <h1 className="font-display text-3xl font-bold text-foreground">Intellinks Chat</h1>
             <p className="text-muted-foreground">Chat, meet, and share with your team</p>
           </div>
           <div className="flex gap-2">
