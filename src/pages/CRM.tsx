@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -26,6 +29,7 @@ import {
   Target,
   Handshake,
 } from 'lucide-react';
+import { toast } from 'sonner';
 
 const leads = [
   { id: 1, company: 'TechCorp Inc.', contact: 'John Williams', email: 'john@techcorp.com', phone: '+1 555-0101', value: '$50,000', stage: 'qualification', source: 'Website' },
@@ -51,6 +55,50 @@ const activities = [
 
 export default function CRM() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
+  const [isCompanyDialogOpen, setIsCompanyDialogOpen] = useState(false);
+  const [isActivityDialogOpen, setIsActivityDialogOpen] = useState(false);
+  const [leadCompany, setLeadCompany] = useState('');
+  const [leadContact, setLeadContact] = useState('');
+  const [leadEmail, setLeadEmail] = useState('');
+  const [leadValue, setLeadValue] = useState('');
+  const [companyName, setCompanyName] = useState('');
+  const [activityType, setActivityType] = useState('');
+  const [activityDescription, setActivityDescription] = useState('');
+
+  const handleAddLead = () => {
+    if (!leadCompany || !leadContact) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+    toast.success(`Lead "${leadCompany}" added successfully`);
+    setIsLeadDialogOpen(false);
+    setLeadCompany('');
+    setLeadContact('');
+    setLeadEmail('');
+    setLeadValue('');
+  };
+
+  const handleAddCompany = () => {
+    if (!companyName) {
+      toast.error('Please enter company name');
+      return;
+    }
+    toast.success(`Company "${companyName}" added successfully`);
+    setIsCompanyDialogOpen(false);
+    setCompanyName('');
+  };
+
+  const handleScheduleActivity = () => {
+    if (!activityDescription) {
+      toast.error('Please enter activity description');
+      return;
+    }
+    toast.success('Activity scheduled successfully');
+    setIsActivityDialogOpen(false);
+    setActivityType('');
+    setActivityDescription('');
+  };
 
   const getStageBadge = (stage: string) => {
     const stages: Record<string, { label: string; className: string }> = {
@@ -86,14 +134,83 @@ export default function CRM() {
             <p className="text-muted-foreground">Manage leads, deals, and customer relationships</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Building2 className="mr-2 h-4 w-4" />
-              Add Company
-            </Button>
-            <Button className="gradient-primary text-primary-foreground">
-              <Plus className="mr-2 h-4 w-4" />
-              New Lead
-            </Button>
+            <Dialog open={isCompanyDialogOpen} onOpenChange={setIsCompanyDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Building2 className="mr-2 h-4 w-4" />
+                  Add Company
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Company</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Company Name *</Label>
+                    <Input
+                      value={companyName}
+                      onChange={(e) => setCompanyName(e.target.value)}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleAddCompany}>
+                    Add Company
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground">
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Lead
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Add New Lead</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Company Name *</Label>
+                    <Input
+                      value={leadCompany}
+                      onChange={(e) => setLeadCompany(e.target.value)}
+                      placeholder="Enter company name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Contact Person *</Label>
+                    <Input
+                      value={leadContact}
+                      onChange={(e) => setLeadContact(e.target.value)}
+                      placeholder="Enter contact name"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Email</Label>
+                    <Input
+                      type="email"
+                      value={leadEmail}
+                      onChange={(e) => setLeadEmail(e.target.value)}
+                      placeholder="contact@company.com"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Estimated Value</Label>
+                    <Input
+                      value={leadValue}
+                      onChange={(e) => setLeadValue(e.target.value)}
+                      placeholder="$50,000"
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleAddLead}>
+                    Add Lead
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -294,10 +411,45 @@ export default function CRM() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Upcoming Activities</CardTitle>
-                  <Button variant="outline">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Schedule Activity
-                  </Button>
+                  <Dialog open={isActivityDialogOpen} onOpenChange={setIsActivityDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button variant="outline">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Schedule Activity
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Schedule Activity</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Activity Type</Label>
+                          <Select value={activityType} onValueChange={setActivityType}>
+                            <SelectTrigger>
+                              <SelectValue placeholder="Select type" />
+                            </SelectTrigger>
+                            <SelectContent>
+                              <SelectItem value="call">Call</SelectItem>
+                              <SelectItem value="email">Email</SelectItem>
+                              <SelectItem value="meeting">Meeting</SelectItem>
+                            </SelectContent>
+                          </Select>
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Description *</Label>
+                          <Input
+                            value={activityDescription}
+                            onChange={(e) => setActivityDescription(e.target.value)}
+                            placeholder="Activity description"
+                          />
+                        </div>
+                        <Button className="w-full" onClick={handleScheduleActivity}>
+                          Schedule Activity
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>

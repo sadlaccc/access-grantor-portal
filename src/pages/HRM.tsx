@@ -5,6 +5,9 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   Table,
   TableBody,
@@ -26,6 +29,7 @@ import {
   GraduationCap,
 } from 'lucide-react';
 import { users } from '@/data/mockData';
+import { toast } from 'sonner';
 
 const leaveRequests = [
   { id: 1, employee: 'Sarah Johnson', type: 'Annual Leave', from: '2024-01-20', to: '2024-01-25', status: 'pending', days: 5 },
@@ -50,6 +54,36 @@ const trainings = [
 
 export default function HRM() {
   const [searchTerm, setSearchTerm] = useState('');
+  const [isEmployeeDialogOpen, setIsEmployeeDialogOpen] = useState(false);
+  const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
+  const [employeeName, setEmployeeName] = useState('');
+  const [employeeEmail, setEmployeeEmail] = useState('');
+  const [employeeDepartment, setEmployeeDepartment] = useState('');
+  const [trainingName, setTrainingName] = useState('');
+  const [trainingDueDate, setTrainingDueDate] = useState('');
+
+  const handleAddEmployee = () => {
+    if (!employeeName || !employeeEmail) {
+      toast.error('Please fill in required fields');
+      return;
+    }
+    toast.success(`Employee "${employeeName}" added successfully`);
+    setIsEmployeeDialogOpen(false);
+    setEmployeeName('');
+    setEmployeeEmail('');
+    setEmployeeDepartment('');
+  };
+
+  const handleCreateTraining = () => {
+    if (!trainingName) {
+      toast.error('Please enter training name');
+      return;
+    }
+    toast.success(`Training "${trainingName}" created successfully`);
+    setIsTrainingDialogOpen(false);
+    setTrainingName('');
+    setTrainingDueDate('');
+  };
 
   const getStatusBadge = (status: string) => {
     switch (status) {
@@ -72,10 +106,56 @@ export default function HRM() {
             <h1 className="font-display text-3xl font-bold text-foreground">Human Resources</h1>
             <p className="text-muted-foreground">Manage employees, attendance, and HR operations</p>
           </div>
-          <Button className="gradient-primary text-primary-foreground">
-            <Plus className="mr-2 h-4 w-4" />
-            Add Employee
-          </Button>
+          <Dialog open={isEmployeeDialogOpen} onOpenChange={setIsEmployeeDialogOpen}>
+            <DialogTrigger asChild>
+              <Button className="gradient-primary text-primary-foreground">
+                <Plus className="mr-2 h-4 w-4" />
+                Add Employee
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Employee</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Full Name *</Label>
+                  <Input
+                    value={employeeName}
+                    onChange={(e) => setEmployeeName(e.target.value)}
+                    placeholder="Enter employee name"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Email *</Label>
+                  <Input
+                    type="email"
+                    value={employeeEmail}
+                    onChange={(e) => setEmployeeEmail(e.target.value)}
+                    placeholder="employee@company.com"
+                  />
+                </div>
+                <div className="space-y-2">
+                  <Label>Department</Label>
+                  <Select value={employeeDepartment} onValueChange={setEmployeeDepartment}>
+                    <SelectTrigger>
+                      <SelectValue placeholder="Select department" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      <SelectItem value="Engineering">Engineering</SelectItem>
+                      <SelectItem value="Operations">Operations</SelectItem>
+                      <SelectItem value="HR">HR</SelectItem>
+                      <SelectItem value="Finance">Finance</SelectItem>
+                      <SelectItem value="IT">IT</SelectItem>
+                    </SelectContent>
+                  </Select>
+                </div>
+                <Button className="w-full" onClick={handleAddEmployee}>
+                  Add Employee
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats */}
@@ -309,10 +389,40 @@ export default function HRM() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Training Programs</CardTitle>
-                  <Button className="gradient-primary text-primary-foreground">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Create Training
-                  </Button>
+                  <Dialog open={isTrainingDialogOpen} onOpenChange={setIsTrainingDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="gradient-primary text-primary-foreground">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Create Training
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Create New Training</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Training Name *</Label>
+                          <Input
+                            value={trainingName}
+                            onChange={(e) => setTrainingName(e.target.value)}
+                            placeholder="e.g., Cybersecurity Basics"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Due Date</Label>
+                          <Input
+                            type="date"
+                            value={trainingDueDate}
+                            onChange={(e) => setTrainingDueDate(e.target.value)}
+                          />
+                        </div>
+                        <Button className="w-full" onClick={handleCreateTraining}>
+                          Create Training
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
