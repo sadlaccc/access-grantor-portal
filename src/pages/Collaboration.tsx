@@ -6,6 +6,9 @@ import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import {
   MessageSquare,
   Video,
@@ -22,6 +25,7 @@ import {
   MoreVertical,
 } from 'lucide-react';
 import { users } from '@/data/mockData';
+import { toast } from 'sonner';
 
 const channels = [
   { id: 1, name: 'general', type: 'public', members: 35, unread: 12, lastMessage: 'Welcome to the new quarter!' },
@@ -55,6 +59,46 @@ const messages = [
 export default function Collaboration() {
   const [searchTerm, setSearchTerm] = useState('');
   const [messageInput, setMessageInput] = useState('');
+  const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false);
+  const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
+  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
+  const [channelName, setChannelName] = useState('');
+  const [channelType, setChannelType] = useState('public');
+  const [meetingTitle, setMeetingTitle] = useState('');
+  const [meetingTime, setMeetingTime] = useState('');
+
+  const handleCreateChannel = () => {
+    if (!channelName) {
+      toast.error('Please enter channel name');
+      return;
+    }
+    toast.success(`Channel "#${channelName}" created successfully`);
+    setIsChannelDialogOpen(false);
+    setChannelName('');
+    setChannelType('public');
+  };
+
+  const handleScheduleMeeting = () => {
+    if (!meetingTitle) {
+      toast.error('Please enter meeting title');
+      return;
+    }
+    toast.success(`Meeting "${meetingTitle}" scheduled successfully`);
+    setIsMeetingDialogOpen(false);
+    setMeetingTitle('');
+    setMeetingTime('');
+  };
+
+  const handleUploadFile = () => {
+    toast.success('File upload dialog opened');
+    setIsUploadDialogOpen(false);
+  };
+
+  const handleSendMessage = () => {
+    if (!messageInput.trim()) return;
+    toast.success('Message sent');
+    setMessageInput('');
+  };
 
   const getFileIcon = (type: string) => {
     return <FileText className="h-5 w-5" />;
@@ -69,14 +113,78 @@ export default function Collaboration() {
             <p className="text-muted-foreground">Chat, meet, and share with your team</p>
           </div>
           <div className="flex gap-2">
-            <Button variant="outline">
-              <Video className="mr-2 h-4 w-4" />
-              Start Meeting
-            </Button>
-            <Button className="gradient-primary text-primary-foreground">
-              <Plus className="mr-2 h-4 w-4" />
-              Create Channel
-            </Button>
+            <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
+              <DialogTrigger asChild>
+                <Button variant="outline">
+                  <Video className="mr-2 h-4 w-4" />
+                  Start Meeting
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Schedule Meeting</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Meeting Title *</Label>
+                    <Input
+                      value={meetingTitle}
+                      onChange={(e) => setMeetingTitle(e.target.value)}
+                      placeholder="Enter meeting title"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Time</Label>
+                    <Input
+                      type="time"
+                      value={meetingTime}
+                      onChange={(e) => setMeetingTime(e.target.value)}
+                    />
+                  </div>
+                  <Button className="w-full" onClick={handleScheduleMeeting}>
+                    Schedule Meeting
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
+            <Dialog open={isChannelDialogOpen} onOpenChange={setIsChannelDialogOpen}>
+              <DialogTrigger asChild>
+                <Button className="gradient-primary text-primary-foreground">
+                  <Plus className="mr-2 h-4 w-4" />
+                  Create Channel
+                </Button>
+              </DialogTrigger>
+              <DialogContent>
+                <DialogHeader>
+                  <DialogTitle>Create New Channel</DialogTitle>
+                </DialogHeader>
+                <div className="space-y-4">
+                  <div className="space-y-2">
+                    <Label>Channel Name *</Label>
+                    <Input
+                      value={channelName}
+                      onChange={(e) => setChannelName(e.target.value)}
+                      placeholder="e.g., project-updates"
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Channel Type</Label>
+                    <Select value={channelType} onValueChange={setChannelType}>
+                      <SelectTrigger>
+                        <SelectValue />
+                      </SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="public">Public</SelectItem>
+                        <SelectItem value="private">Private</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <Button className="w-full" onClick={handleCreateChannel}>
+                    Create Channel
+                  </Button>
+                </div>
+              </DialogContent>
+            </Dialog>
           </div>
         </div>
 
@@ -248,16 +356,17 @@ export default function Collaboration() {
                   </div>
                   <div className="border-t pt-4">
                     <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" className="shrink-0">
+                      <Button variant="ghost" size="icon" className="shrink-0" onClick={() => toast.info('Attach file feature coming soon')}>
                         <Paperclip className="h-4 w-4" />
                       </Button>
                       <Input
                         placeholder="Type a message..."
                         value={messageInput}
                         onChange={(e) => setMessageInput(e.target.value)}
+                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
                         className="flex-1"
                       />
-                      <Button className="gradient-primary text-primary-foreground shrink-0">
+                      <Button className="gradient-primary text-primary-foreground shrink-0" onClick={handleSendMessage}>
                         <Send className="h-4 w-4" />
                       </Button>
                     </div>
@@ -272,10 +381,40 @@ export default function Collaboration() {
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Today's Meetings</CardTitle>
-                  <Button className="gradient-primary text-primary-foreground">
-                    <Plus className="mr-2 h-4 w-4" />
-                    Schedule Meeting
-                  </Button>
+                  <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
+                    <DialogTrigger asChild>
+                      <Button className="gradient-primary text-primary-foreground">
+                        <Plus className="mr-2 h-4 w-4" />
+                        Schedule Meeting
+                      </Button>
+                    </DialogTrigger>
+                    <DialogContent>
+                      <DialogHeader>
+                        <DialogTitle>Schedule Meeting</DialogTitle>
+                      </DialogHeader>
+                      <div className="space-y-4">
+                        <div className="space-y-2">
+                          <Label>Meeting Title *</Label>
+                          <Input
+                            value={meetingTitle}
+                            onChange={(e) => setMeetingTitle(e.target.value)}
+                            placeholder="Enter meeting title"
+                          />
+                        </div>
+                        <div className="space-y-2">
+                          <Label>Time</Label>
+                          <Input
+                            type="time"
+                            value={meetingTime}
+                            onChange={(e) => setMeetingTime(e.target.value)}
+                          />
+                        </div>
+                        <Button className="w-full" onClick={handleScheduleMeeting}>
+                          Schedule Meeting
+                        </Button>
+                      </div>
+                    </DialogContent>
+                  </Dialog>
                 </div>
               </CardHeader>
               <CardContent>
@@ -322,7 +461,7 @@ export default function Collaboration() {
               <CardHeader className="pb-4">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Shared Files</CardTitle>
-                  <Button variant="outline">
+                  <Button variant="outline" onClick={() => toast.info('File upload feature coming soon')}>
                     <Plus className="mr-2 h-4 w-4" />
                     Upload File
                   </Button>
