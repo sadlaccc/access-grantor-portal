@@ -9,7 +9,6 @@ import {
   BarChart3,
   BookOpen,
   Settings,
-  Shield,
   ChevronLeft,
   ChevronRight,
   LogOut,
@@ -24,6 +23,7 @@ import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
+import intellinksLogo from '@/assets/intellinks-logo.png';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Headphones,
@@ -68,10 +68,12 @@ export function Sidebar() {
         <div className="flex h-16 items-center justify-between border-b border-sidebar-border px-4">
           {!collapsed && (
             <div className="flex items-center gap-2">
-              <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary">
-                <Shield className="h-5 w-5 text-primary-foreground" />
-              </div>
-              <span className="font-display font-bold text-sidebar-foreground">Intellinks EA</span>
+              <img src={intellinksLogo} alt="Intellinks EA" className="h-8 w-auto" />
+            </div>
+          )}
+          {collapsed && (
+            <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary">
+              <span className="text-primary-foreground font-bold text-sm">IE</span>
             </div>
           )}
           <Button
