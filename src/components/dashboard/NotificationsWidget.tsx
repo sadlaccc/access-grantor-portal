@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
+import { usePushNotifications } from '@/hooks/usePushNotifications';
 
 interface Notification {
   id: string;
@@ -32,6 +33,7 @@ const notificationColors = {
 export function NotificationsWidget() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
+  const { sendNotification, permission } = usePushNotifications();
 
   useEffect(() => {
     // Fetch initial recent tickets as notifications
@@ -82,6 +84,14 @@ export function NotificationsWidget() {
           };
           setNotifications((prev) => [newNotification, ...prev.slice(0, 19)]);
           setUnreadCount((prev) => prev + 1);
+
+          // Send browser push notification
+          if (permission === 'granted') {
+            sendNotification(`New Ticket #${ticket.ticket_number}`, {
+              body: ticket.title,
+              tag: `ticket-${ticket.id}`,
+            });
+          }
         }
       )
       .on(
@@ -107,6 +117,14 @@ export function NotificationsWidget() {
             };
             setNotifications((prev) => [newNotification, ...prev.slice(0, 19)]);
             setUnreadCount((prev) => prev + 1);
+
+            // Send browser push notification for status changes
+            if (permission === 'granted') {
+              sendNotification(`Ticket #${ticket.ticket_number} Updated`, {
+                body: `Status changed to ${ticket.status}`,
+                tag: `ticket-update-${ticket.id}`,
+              });
+            }
           }
         }
       )
