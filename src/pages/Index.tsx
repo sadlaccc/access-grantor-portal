@@ -3,6 +3,8 @@ import { MainLayout } from '@/components/layout/MainLayout';
 import { AppCard } from '@/components/dashboard/AppCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentTickets } from '@/components/dashboard/RecentTickets';
+import { NotificationsWidget } from '@/components/dashboard/NotificationsWidget';
+import { WelcomeGreeting } from '@/components/dashboard/WelcomeGreeting';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
 import { tickets, projects, assets } from '@/data/mockData';
@@ -14,8 +16,6 @@ const Index = () => {
   const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in-progress').length;
   const activeProjects = projects.filter((p) => p.status === 'active').length;
   const availableAssets = assets.filter((a) => a.status === 'available').length;
-
-  const firstName = profile?.full_name?.split(' ')[0] || 'User';
 
   if (isLoading) {
     return (
@@ -30,14 +30,9 @@ const Index = () => {
   return (
     <MainLayout>
       <div className="p-8">
-        {/* Header */}
+        {/* Welcome Greeting */}
         <div className="mb-8 animate-fade-in">
-          <h1 className="font-display text-3xl font-bold text-foreground">
-            Welcome back, {firstName}
-          </h1>
-          <p className="mt-1 text-muted-foreground">
-            Here's what's happening across your workspace today.
-          </p>
+          <WelcomeGreeting />
         </div>
 
         {/* Stats */}
@@ -83,9 +78,18 @@ const Index = () => {
           )}
         </div>
 
-        {/* Recent Activity */}
-        <div className="grid gap-6 lg:grid-cols-2">
-          <RecentTickets />
+        {/* Recent Activity & Notifications */}
+        <div className="grid gap-6 lg:grid-cols-3">
+          <div className="lg:col-span-2">
+            <RecentTickets />
+          </div>
+          <div>
+            <NotificationsWidget />
+          </div>
+        </div>
+
+        {/* Active Projects */}
+        <div className="mt-6">
           <div className="rounded-xl border border-border bg-card">
             <div className="border-b border-border px-6 py-4">
               <h3 className="font-display font-semibold text-card-foreground">Active Projects</h3>
