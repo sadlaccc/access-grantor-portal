@@ -5,6 +5,7 @@ import { StatsCard } from '@/components/dashboard/StatsCard';
 import { RecentTickets } from '@/components/dashboard/RecentTickets';
 import { NotificationsWidget } from '@/components/dashboard/NotificationsWidget';
 import { WelcomeGreeting } from '@/components/dashboard/WelcomeGreeting';
+import { QuickActionsPanel } from '@/components/dashboard/QuickActionsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
 import { tickets, projects, assets } from '@/data/mockData';
@@ -78,7 +79,11 @@ const Index = () => {
           )}
         </div>
 
-        {/* Recent Activity & Notifications */}
+        {/* Quick Actions & Recent Activity & Notifications */}
+        <div className="mb-6">
+          <QuickActionsPanel />
+        </div>
+
         <div className="grid gap-6 lg:grid-cols-3">
           <div className="lg:col-span-2">
             <RecentTickets />
