@@ -1,11 +1,12 @@
 import { useState } from 'react';
 import { Navigate } from 'react-router-dom';
-import { Shield, Mail, Lock, Eye, EyeOff, Loader2 } from 'lucide-react';
+import { Mail, Lock, Eye, EyeOff, Loader2, CheckCircle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
+import intellinksLogo from '@/assets/intellinks-logo.png';
 
 const Auth = () => {
   const { user, loading, signIn } = useAuth();
@@ -44,32 +45,32 @@ const Auth = () => {
       <div className="hidden w-1/2 gradient-primary lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
         <div className="max-w-md text-center">
           <div className="mb-8 flex justify-center">
-            <div className="flex h-20 w-20 items-center justify-center rounded-2xl bg-white/10 backdrop-blur-sm">
-              <Shield className="h-12 w-12 text-white" />
+            <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white p-3 shadow-lg">
+              <img src={intellinksLogo} alt="Intellinks East Africa" className="h-full w-full object-contain" />
             </div>
           </div>
           <h1 className="font-display text-4xl font-bold text-white">
             Intellinks East Africa
           </h1>
           <p className="mt-4 text-lg text-white/80">
-            Enterprise IT Management Portal
+            Enterprise Management Portal
           </p>
           <div className="mt-12 space-y-4 text-left">
             <div className="flex items-center gap-3 text-white/90">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                <Shield className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" />
               </div>
               <span>Secure authentication & role-based access</span>
             </div>
             <div className="flex items-center gap-3 text-white/90">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                <Shield className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" />
               </div>
-              <span>Integrated IT helpdesk & asset management</span>
+              <span>Integrated helpdesk & asset management</span>
             </div>
             <div className="flex items-center gap-3 text-white/90">
               <div className="flex h-8 w-8 items-center justify-center rounded-lg bg-white/10">
-                <Shield className="h-4 w-4" />
+                <CheckCircle className="h-4 w-4" />
               </div>
               <span>AI-powered assistant for every user</span>
             </div>
@@ -81,12 +82,12 @@ const Auth = () => {
       <div className="flex w-full flex-col items-center justify-center p-8 lg:w-1/2">
         <div className="mb-8 lg:hidden">
           <div className="flex items-center gap-3">
-            <div className="flex h-12 w-12 items-center justify-center rounded-xl gradient-primary">
-              <Shield className="h-7 w-7 text-white" />
+            <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 p-1">
+              <img src={intellinksLogo} alt="Intellinks East Africa" className="h-full w-full object-contain" />
             </div>
             <div>
               <h1 className="font-display text-xl font-bold text-foreground">Intellinks East Africa</h1>
-              <p className="text-sm text-muted-foreground">IT Management Portal</p>
+              <p className="text-sm text-muted-foreground">Enterprise Management Portal</p>
             </div>
           </div>
         </div>
