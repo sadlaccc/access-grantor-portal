@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { Link, useLocation } from 'react-router-dom';
+import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard,
   Headphones,
@@ -31,6 +32,11 @@ const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   UserCog, Handshake, MessageCircle, Package, DollarSign,
 };
 
+const navItemVariants = {
+  hidden: { opacity: 0, x: -8 },
+  show: { opacity: 1, x: 0 },
+};
+
 export function Sidebar() {
   const [collapsed, setCollapsed] = useState(false);
   const location = useLocation();
@@ -54,16 +60,29 @@ export function Sidebar() {
       <div className="flex h-full flex-col">
         {/* Logo */}
         <div className="flex h-16 items-center justify-between px-4 border-b border-white/[0.06]">
-          {!collapsed && (
-            <div className="flex items-center gap-2.5 animate-fade-in">
-              <img src={intellinksLogo} alt="Intellinks EA" className="h-8 w-auto" />
-            </div>
-          )}
-          {collapsed && (
-            <div className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
-              <span className="text-primary-foreground font-bold text-xs">IE</span>
-            </div>
-          )}
+          <AnimatePresence mode="wait">
+            {!collapsed ? (
+              <motion.div
+                key="full-logo"
+                initial={{ opacity: 0 }}
+                animate={{ opacity: 1 }}
+                exit={{ opacity: 0 }}
+                className="flex items-center gap-2.5"
+              >
+                <img src={intellinksLogo} alt="Intellinks EA" className="h-8 w-auto" />
+              </motion.div>
+            ) : (
+              <motion.div
+                key="mini-logo"
+                initial={{ scale: 0.8, opacity: 0 }}
+                animate={{ scale: 1, opacity: 1 }}
+                exit={{ scale: 0.8, opacity: 0 }}
+                className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow"
+              >
+                <span className="text-primary-foreground font-bold text-xs">IE</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
           <div className="flex items-center gap-0.5">
             <ThemeToggle />
             <Button
@@ -72,7 +91,12 @@ export function Sidebar() {
               onClick={() => setCollapsed(!collapsed)}
               className="h-8 w-8 text-sidebar-muted hover:text-sidebar-foreground hover:bg-white/[0.06] rounded-lg"
             >
-              {collapsed ? <ChevronRight className="h-4 w-4" /> : <ChevronLeft className="h-4 w-4" />}
+              <motion.div
+                animate={{ rotate: collapsed ? 0 : 180 }}
+                transition={{ duration: 0.2 }}
+              >
+                <ChevronRight className="h-4 w-4" />
+              </motion.div>
             </Button>
           </div>
         </div>
@@ -87,13 +111,20 @@ export function Sidebar() {
             collapsed={collapsed}
           />
 
-          {!collapsed && (
-            <div className="px-3 pb-1 pt-5">
-              <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-muted">
-                Applications
-              </span>
-            </div>
-          )}
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+                className="px-3 pb-1 pt-5"
+              >
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-muted">
+                  Applications
+                </span>
+              </motion.div>
+            )}
+          </AnimatePresence>
           {collapsed && <div className="my-3 mx-2 h-px bg-white/[0.06]" />}
 
           {isLoading ? (
@@ -101,30 +132,44 @@ export function Sidebar() {
               <Loader2 className="h-4 w-4 animate-spin text-sidebar-muted" />
             </div>
           ) : (
-            apps.map((app) => {
-              const Icon = iconMap[app.icon] || Monitor;
-              return (
-                <NavItem
-                  key={app.id}
-                  to={app.route}
-                  icon={Icon}
-                  label={app.name}
-                  active={location.pathname === app.route}
-                  collapsed={collapsed}
-                />
-              );
-            })
+            <motion.div
+              initial="hidden"
+              animate="show"
+              variants={{ show: { transition: { staggerChildren: 0.03 } } }}
+            >
+              {apps.map((app) => {
+                const Icon = iconMap[app.icon] || Monitor;
+                return (
+                  <motion.div key={app.id} variants={navItemVariants}>
+                    <NavItem
+                      to={app.route}
+                      icon={Icon}
+                      label={app.name}
+                      active={location.pathname === app.route}
+                      collapsed={collapsed}
+                    />
+                  </motion.div>
+                );
+              })}
+            </motion.div>
           )}
 
           {isAdmin && (
             <>
-              {!collapsed && (
-                <div className="px-3 pb-1 pt-5">
-                  <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-muted">
-                    Administration
-                  </span>
-                </div>
-              )}
+              <AnimatePresence>
+                {!collapsed && (
+                  <motion.div
+                    initial={{ opacity: 0, height: 0 }}
+                    animate={{ opacity: 1, height: 'auto' }}
+                    exit={{ opacity: 0, height: 0 }}
+                    className="px-3 pb-1 pt-5"
+                  >
+                    <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-muted">
+                      Administration
+                    </span>
+                  </motion.div>
+                )}
+              </AnimatePresence>
               {collapsed && <div className="my-3 mx-2 h-px bg-white/[0.06]" />}
               <NavItem
                 to="/admin"
@@ -142,37 +187,55 @@ export function Sidebar() {
           <Link
             to="/profile"
             className={cn(
-              'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200',
+              'flex items-center gap-3 rounded-xl px-3 py-2.5 transition-all duration-200 group',
               'hover:bg-white/[0.06]',
-              location.pathname === '/profile' && 'bg-white/[0.06]',
+              location.pathname === '/profile' && 'bg-white/[0.08]',
               collapsed && 'justify-center px-0'
             )}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/80 to-accent/80 text-xs font-bold text-white shadow-sm">
-              {userInitials}
-            </div>
-            {!collapsed && (
-              <div className="flex-1 overflow-hidden">
-                <p className="truncate text-sm font-medium text-sidebar-foreground">
-                  {profile?.full_name || user?.email}
-                </p>
-                <p className="truncate text-xs text-sidebar-muted">
-                  {isAdmin ? 'Administrator' : 'Member'}
-                </p>
+            <div className="relative">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-gradient-to-br from-primary/80 to-accent/80 text-xs font-bold text-white shadow-sm group-hover:shadow-md transition-shadow">
+                {userInitials}
               </div>
-            )}
+              <span className="absolute -bottom-0.5 -right-0.5 h-2.5 w-2.5 rounded-full bg-success border-2 border-sidebar-background"></span>
+            </div>
+            <AnimatePresence>
+              {!collapsed && (
+                <motion.div
+                  initial={{ opacity: 0, width: 0 }}
+                  animate={{ opacity: 1, width: 'auto' }}
+                  exit={{ opacity: 0, width: 0 }}
+                  className="flex-1 overflow-hidden"
+                >
+                  <p className="truncate text-sm font-medium text-sidebar-foreground">
+                    {profile?.full_name || user?.email}
+                  </p>
+                  <p className="truncate text-xs text-sidebar-muted">
+                    {isAdmin ? 'Administrator' : 'Member'}
+                  </p>
+                </motion.div>
+              )}
+            </AnimatePresence>
           </Link>
-          {!collapsed && (
-            <Button
-              variant="ghost"
-              size="sm"
-              className="w-full justify-start mt-1 text-sidebar-muted hover:text-sidebar-foreground hover:bg-white/[0.06] rounded-lg"
-              onClick={handleSignOut}
-            >
-              <LogOut className="h-4 w-4 mr-2" />
-              Sign Out
-            </Button>
-          )}
+          <AnimatePresence>
+            {!collapsed && (
+              <motion.div
+                initial={{ opacity: 0, height: 0 }}
+                animate={{ opacity: 1, height: 'auto' }}
+                exit={{ opacity: 0, height: 0 }}
+              >
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="w-full justify-start mt-1 text-sidebar-muted hover:text-sidebar-foreground hover:bg-white/[0.06] rounded-lg"
+                  onClick={handleSignOut}
+                >
+                  <LogOut className="h-4 w-4 mr-2" />
+                  Sign Out
+                </Button>
+              </motion.div>
+            )}
+          </AnimatePresence>
         </div>
       </div>
     </aside>
@@ -188,20 +251,42 @@ function NavItem({
     <Link
       to={to}
       className={cn(
-        'group flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
+        'group relative flex items-center gap-3 rounded-xl px-3 py-2.5 text-sm font-medium transition-all duration-200',
         active
-          ? 'bg-primary/15 text-primary shadow-sm shadow-primary/10'
+          ? 'bg-primary/15 text-primary'
           : 'text-sidebar-muted hover:text-sidebar-foreground hover:bg-white/[0.06]',
         collapsed && 'justify-center px-0'
       )}
     >
+      {active && (
+        <motion.div
+          layoutId="activeIndicator"
+          className="absolute inset-0 rounded-xl bg-primary/15"
+          transition={{ type: 'spring', stiffness: 380, damping: 30 }}
+        />
+      )}
       <Icon className={cn(
-        'h-[18px] w-[18px] shrink-0 transition-colors',
+        'h-[18px] w-[18px] shrink-0 transition-all duration-200 relative z-10',
         active ? 'text-primary' : 'text-sidebar-muted group-hover:text-sidebar-foreground'
       )} />
-      {!collapsed && <span>{label}</span>}
+      <AnimatePresence>
+        {!collapsed && (
+          <motion.span
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 1 }}
+            exit={{ opacity: 0 }}
+            className="relative z-10"
+          >
+            {label}
+          </motion.span>
+        )}
+      </AnimatePresence>
       {active && !collapsed && (
-        <div className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-sm shadow-primary/50" />
+        <motion.div
+          initial={{ scale: 0 }}
+          animate={{ scale: 1 }}
+          className="ml-auto h-1.5 w-1.5 rounded-full bg-primary shadow-sm shadow-primary/50 relative z-10"
+        />
       )}
     </Link>
   );
