@@ -90,12 +90,9 @@ const Index = () => {
   return (
     <MainLayout>
       <div className="p-8">
-        {/* Hero Banner */}
-        <div className="mb-8 relative rounded-2xl overflow-hidden animate-fade-in">
-          <img src={dashboardHero} alt="" className="w-full h-48 object-cover" />
-          <div className="absolute inset-0 bg-gradient-to-r from-primary/80 to-primary/40 flex items-center px-8">
-            <WelcomeGreeting />
-          </div>
+        {/* Welcome Greeting */}
+        <div className="mb-8 animate-fade-in">
+          <WelcomeGreeting />
         </div>
 
         {/* Stats */}
