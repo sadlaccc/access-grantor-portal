@@ -685,7 +685,6 @@ const Finance = () => {
                   Export PDF
                 </Button>
               </CardHeader>
-              </CardHeader>
               <CardContent>
                 <Table>
                   <TableHeader>
