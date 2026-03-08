@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
-  TrendingUp, TrendingDown, Loader2, Download, Send
+  TrendingUp, TrendingDown, Loader2, Download, Send, FileDown
 } from 'lucide-react';
+import { generateInvoicePdf, generateExpenseReportPdf } from '@/lib/generateInvoicePdf';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
