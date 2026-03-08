@@ -525,6 +525,16 @@ const Finance = () => {
                         <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required />
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Receipt (optional)</Label>
+                      <FileUpload
+                        bucket="documents"
+                        folder={`receipts/${user?.id}`}
+                        accept="image/*,application/pdf"
+                        maxSizeMB={10}
+                        onUploadComplete={(url) => setExpenseReceipt(url)}
+                      />
+                    </div>
                     <Button
                       onClick={() => createExpenseMutation.mutate()}
                       className="w-full gradient-primary"
