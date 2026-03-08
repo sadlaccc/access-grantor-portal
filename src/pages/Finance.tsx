@@ -194,6 +194,7 @@ const Finance = () => {
         amount: parseFloat(expenseAmount),
         expense_date: expenseDate,
         vendor: expenseVendor || null,
+        receipt_url: expenseReceipt || null,
         status: 'pending',
         created_by: user?.id,
       });
@@ -277,6 +278,7 @@ const Finance = () => {
     setExpenseAmount('');
     setExpenseVendor('');
     setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseReceipt('');
   };
 
   const resetBudgetForm = () => {
