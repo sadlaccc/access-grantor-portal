@@ -19,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { FileUpload } from '@/components/FileUpload';
 
 interface Invoice {
   id: string;
@@ -79,6 +80,7 @@ const Finance = () => {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseVendor, setExpenseVendor] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseReceipt, setExpenseReceipt] = useState('');
 
   // Budget form state
   const [budgetName, setBudgetName] = useState('');
