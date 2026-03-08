@@ -1,503 +1,518 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ScrollArea } from '@/components/ui/scroll-area';
+import { DropdownMenu, DropdownMenuContent, DropdownMenuItem, DropdownMenuTrigger } from '@/components/ui/dropdown-menu';
+import { Separator } from '@/components/ui/separator';
 import {
-  MessageSquare,
-  Video,
-  FileText,
-  Users,
-  Plus,
-  Search,
-  Hash,
-  Lock,
-  Calendar,
-  Clock,
-  Paperclip,
-  Send,
-  MoreVertical,
+  MessageSquare, Plus, Search, Hash, Lock, Send, MoreVertical,
+  Trash2, Users, User, SmilePlus, ChevronDown,
 } from 'lucide-react';
-import { users } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { motion, AnimatePresence } from 'framer-motion';
+import { format } from 'date-fns';
 
-const channels = [
-  { id: 1, name: 'general', type: 'public', members: 35, unread: 12, lastMessage: 'Welcome to the new quarter!' },
-  { id: 2, name: 'engineering', type: 'public', members: 12, unread: 5, lastMessage: 'Sprint planning at 2pm' },
-  { id: 3, name: 'hr-team', type: 'private', members: 4, unread: 0, lastMessage: 'Onboarding docs updated' },
-  { id: 4, name: 'project-alpha', type: 'private', members: 8, unread: 3, lastMessage: 'Milestone achieved!' },
-  { id: 5, name: 'random', type: 'public', members: 28, unread: 0, lastMessage: 'Friday lunch plans?' },
-];
+type Channel = { id: string; name: string; type: string; created_by: string };
+type ChannelMessage = { id: string; channel_id: string; user_id: string; content: string; created_at: string; profile?: { full_name: string | null; avatar_url: string | null } };
+type DirectMessage = { id: string; sender_id: string; receiver_id: string; content: string; created_at: string; sender_profile?: { full_name: string | null }; receiver_profile?: { full_name: string | null } };
+type Profile = { id: string; full_name: string | null; avatar_url: string | null; email: string };
 
-const meetings = [
-  { id: 1, title: 'Daily Standup', time: '09:00 AM', duration: '15 min', participants: 8, type: 'recurring', status: 'upcoming' },
-  { id: 2, title: 'Product Review', time: '11:00 AM', duration: '1 hour', participants: 12, type: 'one-time', status: 'upcoming' },
-  { id: 3, title: 'Client Demo', time: '02:00 PM', duration: '45 min', participants: 5, type: 'one-time', status: 'upcoming' },
-  { id: 4, title: 'Team Retrospective', time: '04:00 PM', duration: '1 hour', participants: 6, type: 'recurring', status: 'scheduled' },
-];
-
-const documents = [
-  { id: 1, name: 'Q1 2024 Planning.docx', type: 'document', size: '245 KB', modified: '2024-01-15', author: 'John Smith', shared: 12 },
-  { id: 2, name: 'Product Roadmap.xlsx', type: 'spreadsheet', size: '1.2 MB', modified: '2024-01-14', author: 'Sarah Johnson', shared: 8 },
-  { id: 3, name: 'Brand Guidelines.pdf', type: 'pdf', size: '5.8 MB', modified: '2024-01-10', author: 'Emily Davis', shared: 35 },
-  { id: 4, name: 'Meeting Notes - Jan.docx', type: 'document', size: '128 KB', modified: '2024-01-18', author: 'Mike Chen', shared: 6 },
-  { id: 5, name: 'Budget Proposal.xlsx', type: 'spreadsheet', size: '890 KB', modified: '2024-01-12', author: 'Alex Turner', shared: 4 },
-];
-
-const messages = [
-  { id: 1, user: 'John Smith', avatar: 'JS', message: 'Good morning team! Ready for the sprint review?', time: '9:15 AM', reactions: ['👍', '🚀'] },
-  { id: 2, user: 'Sarah Johnson', avatar: 'SJ', message: 'Just pushed the latest updates to staging. Please review when you get a chance.', time: '9:22 AM', reactions: ['✅'] },
-  { id: 3, user: 'Mike Chen', avatar: 'MC', message: 'Looking great! I\'ll run the tests this afternoon.', time: '9:30 AM', reactions: [] },
-];
+type ChatView = 'channel' | 'dm';
 
 export default function Collaboration() {
-  const [searchTerm, setSearchTerm] = useState('');
+  const { user } = useAuth();
+  const [channels, setChannels] = useState<Channel[]>([]);
+  const [profiles, setProfiles] = useState<Profile[]>([]);
+  const [selectedChannel, setSelectedChannel] = useState<Channel | null>(null);
+  const [selectedDmUser, setSelectedDmUser] = useState<Profile | null>(null);
+  const [chatView, setChatView] = useState<ChatView>('channel');
+  const [channelMessages, setChannelMessages] = useState<ChannelMessage[]>([]);
+  const [directMessages, setDirectMessages] = useState<DirectMessage[]>([]);
   const [messageInput, setMessageInput] = useState('');
+  const [searchTerm, setSearchTerm] = useState('');
   const [isChannelDialogOpen, setIsChannelDialogOpen] = useState(false);
-  const [isMeetingDialogOpen, setIsMeetingDialogOpen] = useState(false);
-  const [isUploadDialogOpen, setIsUploadDialogOpen] = useState(false);
   const [channelName, setChannelName] = useState('');
   const [channelType, setChannelType] = useState('public');
-  const [meetingTitle, setMeetingTitle] = useState('');
-  const [meetingTime, setMeetingTime] = useState('');
+  const [sidebarSection, setSidebarSection] = useState<'channels' | 'dms'>('channels');
+  const messagesEndRef = useRef<HTMLDivElement>(null);
 
-  const handleCreateChannel = () => {
-    if (!channelName) {
-      toast.error('Please enter channel name');
-      return;
+  const scrollToBottom = useCallback(() => {
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
+
+  // Load channels
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('chat_channels').select('*').order('created_at');
+      if (data) {
+        setChannels(data);
+        if (data.length > 0 && !selectedChannel) setSelectedChannel(data[0]);
+      }
+    };
+    load();
+  }, []);
+
+  // Load profiles for DM list
+  useEffect(() => {
+    const load = async () => {
+      const { data } = await supabase.from('profiles').select('id, full_name, avatar_url, email');
+      if (data) setProfiles(data.filter(p => p.id !== user?.id));
+    };
+    load();
+  }, [user]);
+
+  // Load channel messages
+  useEffect(() => {
+    if (!selectedChannel) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('channel_messages')
+        .select('*')
+        .eq('channel_id', selectedChannel.id)
+        .order('created_at');
+      if (data) {
+        // Enrich with profiles
+        const userIds = [...new Set(data.map(m => m.user_id))];
+        const { data: profs } = await supabase.from('profiles').select('id, full_name, avatar_url').in('id', userIds);
+        const profMap = Object.fromEntries((profs || []).map(p => [p.id, p]));
+        setChannelMessages(data.map(m => ({ ...m, profile: profMap[m.user_id] })));
+      }
+    };
+    load();
+  }, [selectedChannel]);
+
+  // Load DMs
+  useEffect(() => {
+    if (!selectedDmUser || !user) return;
+    const load = async () => {
+      const { data } = await supabase
+        .from('direct_messages')
+        .select('*')
+        .or(`and(sender_id.eq.${user.id},receiver_id.eq.${selectedDmUser.id}),and(sender_id.eq.${selectedDmUser.id},receiver_id.eq.${user.id})`)
+        .order('created_at');
+      if (data) setDirectMessages(data);
+    };
+    load();
+  }, [selectedDmUser, user]);
+
+  // Realtime channel messages
+  useEffect(() => {
+    if (!selectedChannel) return;
+    const channel = supabase
+      .channel(`channel-${selectedChannel.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'channel_messages', filter: `channel_id=eq.${selectedChannel.id}` }, async (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new as ChannelMessage;
+          const { data: prof } = await supabase.from('profiles').select('full_name, avatar_url').eq('id', msg.user_id).single();
+          setChannelMessages(prev => [...prev, { ...msg, profile: prof || undefined }]);
+        }
+        if (payload.eventType === 'DELETE') {
+          setChannelMessages(prev => prev.filter(m => m.id !== (payload.old as any).id));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedChannel]);
+
+  // Realtime DMs
+  useEffect(() => {
+    if (!selectedDmUser || !user) return;
+    const channel = supabase
+      .channel(`dm-${selectedDmUser.id}`)
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'direct_messages' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const msg = payload.new as DirectMessage;
+          if ((msg.sender_id === user.id && msg.receiver_id === selectedDmUser.id) ||
+              (msg.sender_id === selectedDmUser.id && msg.receiver_id === user.id)) {
+            setDirectMessages(prev => [...prev, msg]);
+          }
+        }
+        if (payload.eventType === 'DELETE') {
+          setDirectMessages(prev => prev.filter(m => m.id !== (payload.old as any).id));
+        }
+      })
+      .subscribe();
+    return () => { supabase.removeChannel(channel); };
+  }, [selectedDmUser, user]);
+
+  useEffect(() => { scrollToBottom(); }, [channelMessages, directMessages, scrollToBottom]);
+
+  const handleSendMessage = async () => {
+    if (!messageInput.trim() || !user) return;
+    if (chatView === 'channel' && selectedChannel) {
+      await supabase.from('channel_messages').insert({ channel_id: selectedChannel.id, user_id: user.id, content: messageInput.trim() });
+    } else if (chatView === 'dm' && selectedDmUser) {
+      await supabase.from('direct_messages').insert({ sender_id: user.id, receiver_id: selectedDmUser.id, content: messageInput.trim() });
     }
-    toast.success(`Channel "#${channelName}" created successfully`);
-    setIsChannelDialogOpen(false);
-    setChannelName('');
-    setChannelType('public');
-  };
-
-  const handleScheduleMeeting = () => {
-    if (!meetingTitle) {
-      toast.error('Please enter meeting title');
-      return;
-    }
-    toast.success(`Meeting "${meetingTitle}" scheduled successfully`);
-    setIsMeetingDialogOpen(false);
-    setMeetingTitle('');
-    setMeetingTime('');
-  };
-
-  const handleUploadFile = () => {
-    toast.success('File upload dialog opened');
-    setIsUploadDialogOpen(false);
-  };
-
-  const handleSendMessage = () => {
-    if (!messageInput.trim()) return;
-    toast.success('Message sent');
     setMessageInput('');
   };
 
-  const getFileIcon = (type: string) => {
-    return <FileText className="h-5 w-5" />;
+  const handleDeleteChannelMessage = async (msgId: string) => {
+    const { error } = await supabase.from('channel_messages').delete().eq('id', msgId);
+    if (error) toast.error('Failed to delete message');
+    else setChannelMessages(prev => prev.filter(m => m.id !== msgId));
   };
+
+  const handleDeleteDm = async (msgId: string) => {
+    const { error } = await supabase.from('direct_messages').delete().eq('id', msgId);
+    if (error) toast.error('Failed to delete message');
+    else setDirectMessages(prev => prev.filter(m => m.id !== msgId));
+  };
+
+  const handleCreateChannel = async () => {
+    if (!channelName.trim() || !user) { toast.error('Enter a channel name'); return; }
+    const { error } = await supabase.from('chat_channels').insert({ name: channelName.trim().toLowerCase().replace(/\s+/g, '-'), type: channelType, created_by: user.id });
+    if (error) { toast.error('Failed to create channel'); return; }
+    const { data } = await supabase.from('chat_channels').select('*').order('created_at');
+    if (data) setChannels(data);
+    toast.success(`Channel #${channelName} created`);
+    setIsChannelDialogOpen(false);
+    setChannelName('');
+  };
+
+  const handleDeleteChannel = async (channelId: string) => {
+    const { error } = await supabase.from('chat_channels').delete().eq('id', channelId);
+    if (error) { toast.error('Failed to delete channel'); return; }
+    setChannels(prev => prev.filter(c => c.id !== channelId));
+    if (selectedChannel?.id === channelId) {
+      setSelectedChannel(channels.find(c => c.id !== channelId) || null);
+    }
+    toast.success('Channel deleted');
+  };
+
+  const getInitials = (name: string | null | undefined) => {
+    if (!name) return '??';
+    return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
+  };
+
+  const filteredChannels = channels.filter(c => c.name.includes(searchTerm.toLowerCase()));
+  const filteredProfiles = profiles.filter(p =>
+    (p.full_name || p.email).toLowerCase().includes(searchTerm.toLowerCase())
+  );
+
+  const chatTitle = chatView === 'channel' && selectedChannel
+    ? `#${selectedChannel.name}`
+    : chatView === 'dm' && selectedDmUser
+    ? selectedDmUser.full_name || selectedDmUser.email
+    : 'Select a conversation';
+
+  const chatSubtitle = chatView === 'channel' && selectedChannel
+    ? `${selectedChannel.type} channel`
+    : chatView === 'dm' && selectedDmUser
+    ? 'Direct message'
+    : '';
 
   return (
     <MainLayout>
-      <div className="space-y-6">
-        <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-          <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">Intellinks Chat</h1>
-            <p className="text-muted-foreground">Chat, meet, and share with your team</p>
-          </div>
-          <div className="flex gap-2">
-            <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline">
-                  <Video className="mr-2 h-4 w-4" />
-                  Start Meeting
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Schedule Meeting</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Meeting Title *</Label>
-                    <Input
-                      value={meetingTitle}
-                      onChange={(e) => setMeetingTitle(e.target.value)}
-                      placeholder="Enter meeting title"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Time</Label>
-                    <Input
-                      type="time"
-                      value={meetingTime}
-                      onChange={(e) => setMeetingTime(e.target.value)}
-                    />
-                  </div>
-                  <Button className="w-full" onClick={handleScheduleMeeting}>
-                    Schedule Meeting
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-            <Dialog open={isChannelDialogOpen} onOpenChange={setIsChannelDialogOpen}>
-              <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground">
-                  <Plus className="mr-2 h-4 w-4" />
-                  Create Channel
-                </Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader>
-                  <DialogTitle>Create New Channel</DialogTitle>
-                </DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2">
-                    <Label>Channel Name *</Label>
-                    <Input
-                      value={channelName}
-                      onChange={(e) => setChannelName(e.target.value)}
-                      placeholder="e.g., project-updates"
-                    />
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Channel Type</Label>
-                    <Select value={channelType} onValueChange={setChannelType}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="public">Public</SelectItem>
-                        <SelectItem value="private">Private</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <Button className="w-full" onClick={handleCreateChannel}>
-                    Create Channel
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
-          </div>
-        </div>
-
-        {/* Stats */}
-        <div className="grid gap-4 md:grid-cols-4">
-          <Card className="card-elevated">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                  <MessageSquare className="h-6 w-6 text-primary" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{channels.length}</p>
-                  <p className="text-sm text-muted-foreground">Active Channels</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-elevated">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10">
-                  <Users className="h-6 w-6 text-success" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{users.filter(u => u.status === 'active').length}</p>
-                  <p className="text-sm text-muted-foreground">Online Now</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-elevated">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning/10">
-                  <Video className="h-6 w-6 text-warning" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{meetings.filter(m => m.status === 'upcoming').length}</p>
-                  <p className="text-sm text-muted-foreground">Meetings Today</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-          <Card className="card-elevated">
-            <CardContent className="p-6">
-              <div className="flex items-center gap-4">
-                <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10">
-                  <FileText className="h-6 w-6 text-accent" />
-                </div>
-                <div>
-                  <p className="text-2xl font-bold text-foreground">{documents.length}</p>
-                  <p className="text-sm text-muted-foreground">Shared Files</p>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-
-        <Tabs defaultValue="channels" className="space-y-4">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="channels" className="flex items-center gap-2">
-              <MessageSquare className="h-4 w-4" />
-              Channels
-            </TabsTrigger>
-            <TabsTrigger value="meetings" className="flex items-center gap-2">
-              <Video className="h-4 w-4" />
-              Meetings
-            </TabsTrigger>
-            <TabsTrigger value="files" className="flex items-center gap-2">
-              <FileText className="h-4 w-4" />
-              Files
-            </TabsTrigger>
-          </TabsList>
-
-          <TabsContent value="channels">
-            <div className="grid gap-6 lg:grid-cols-3">
-              {/* Channel List */}
-              <Card className="card-elevated lg:col-span-1">
-                <CardHeader className="pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-lg font-semibold">Channels</CardTitle>
-                    <Button variant="ghost" size="icon" className="h-8 w-8">
-                      <Plus className="h-4 w-4" />
-                    </Button>
-                  </div>
-                  <div className="relative">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input
-                      placeholder="Search channels..."
-                      value={searchTerm}
-                      onChange={(e) => setSearchTerm(e.target.value)}
-                      className="pl-9"
-                    />
-                  </div>
-                </CardHeader>
-                <CardContent className="space-y-1">
-                  {channels
-                    .filter(ch => ch.name.includes(searchTerm.toLowerCase()))
-                    .map((channel) => (
-                    <div
-                      key={channel.id}
-                      className="flex items-center justify-between rounded-lg p-3 hover:bg-muted/50 cursor-pointer transition-colors"
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className={`flex h-8 w-8 items-center justify-center rounded-lg ${
-                          channel.type === 'private' ? 'bg-warning/10' : 'bg-primary/10'
-                        }`}>
-                          {channel.type === 'private' ? (
-                            <Lock className="h-4 w-4 text-warning" />
-                          ) : (
-                            <Hash className="h-4 w-4 text-primary" />
-                          )}
-                        </div>
-                        <div>
-                          <p className="font-medium text-sm">{channel.name}</p>
-                          <p className="text-xs text-muted-foreground truncate max-w-[140px]">{channel.lastMessage}</p>
-                        </div>
-                      </div>
-                      {channel.unread > 0 && (
-                        <Badge className="bg-primary text-primary-foreground">{channel.unread}</Badge>
-                      )}
-                    </div>
-                  ))}
-                </CardContent>
-              </Card>
-
-              {/* Chat Area */}
-              <Card className="card-elevated lg:col-span-2">
-                <CardHeader className="border-b">
-                  <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10">
-                        <Hash className="h-5 w-5 text-primary" />
-                      </div>
-                      <div>
-                        <CardTitle className="text-lg font-semibold">general</CardTitle>
-                        <p className="text-sm text-muted-foreground">35 members</p>
-                      </div>
-                    </div>
-                    <Button variant="ghost" size="icon">
-                      <MoreVertical className="h-4 w-4" />
-                    </Button>
-                  </div>
-                </CardHeader>
-                <CardContent className="flex flex-col h-[400px]">
-                  <div className="flex-1 space-y-4 overflow-y-auto py-4">
-                    {messages.map((msg) => (
-                      <div key={msg.id} className="flex gap-3">
-                        <Avatar className="h-9 w-9">
-                          <AvatarFallback className="bg-primary/10 text-primary text-sm">{msg.avatar}</AvatarFallback>
-                        </Avatar>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2">
-                            <p className="font-medium text-sm">{msg.user}</p>
-                            <span className="text-xs text-muted-foreground">{msg.time}</span>
-                          </div>
-                          <p className="text-sm text-foreground mt-1">{msg.message}</p>
-                          {msg.reactions.length > 0 && (
-                            <div className="flex gap-1 mt-2">
-                              {msg.reactions.map((reaction, idx) => (
-                                <span key={idx} className="text-sm bg-muted/50 rounded px-2 py-0.5">{reaction}</span>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                  <div className="border-t pt-4">
-                    <div className="flex gap-2">
-                      <Button variant="ghost" size="icon" className="shrink-0" onClick={() => toast.info('Attach file feature coming soon')}>
-                        <Paperclip className="h-4 w-4" />
-                      </Button>
-                      <Input
-                        placeholder="Type a message..."
-                        value={messageInput}
-                        onChange={(e) => setMessageInput(e.target.value)}
-                        onKeyDown={(e) => e.key === 'Enter' && handleSendMessage()}
-                        className="flex-1"
-                      />
-                      <Button className="gradient-primary text-primary-foreground shrink-0" onClick={handleSendMessage}>
-                        <Send className="h-4 w-4" />
-                      </Button>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+      <div className="p-4 lg:p-6 h-[calc(100vh-0px)]">
+        <div className="flex h-full gap-0 rounded-2xl border border-border/50 bg-card/50 backdrop-blur-sm overflow-hidden shadow-xl">
+          {/* Sidebar */}
+          <div className="w-72 border-r border-border/50 flex flex-col bg-muted/30">
+            {/* Header */}
+            <div className="p-4 border-b border-border/50">
+              <h2 className="font-display text-lg font-bold text-foreground">Intellinks Chat</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">Team messaging</p>
             </div>
-          </TabsContent>
 
-          <TabsContent value="meetings">
-            <Card className="card-elevated">
-              <CardHeader>
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold">Today's Meetings</CardTitle>
-                  <Dialog open={isMeetingDialogOpen} onOpenChange={setIsMeetingDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="gradient-primary text-primary-foreground">
-                        <Plus className="mr-2 h-4 w-4" />
-                        Schedule Meeting
-                      </Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader>
-                        <DialogTitle>Schedule Meeting</DialogTitle>
-                      </DialogHeader>
-                      <div className="space-y-4">
-                        <div className="space-y-2">
-                          <Label>Meeting Title *</Label>
-                          <Input
-                            value={meetingTitle}
-                            onChange={(e) => setMeetingTitle(e.target.value)}
-                            placeholder="Enter meeting title"
-                          />
-                        </div>
-                        <div className="space-y-2">
-                          <Label>Time</Label>
-                          <Input
-                            type="time"
-                            value={meetingTime}
-                            onChange={(e) => setMeetingTime(e.target.value)}
-                          />
-                        </div>
-                        <Button className="w-full" onClick={handleScheduleMeeting}>
-                          Schedule Meeting
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
-                </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-4">
-                  {meetings.map((meeting) => (
-                    <div key={meeting.id} className="flex items-center justify-between rounded-lg border bg-card p-4">
-                      <div className="flex items-center gap-4">
-                        <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                          <Video className="h-6 w-6 text-primary" />
-                        </div>
-                        <div>
-                          <p className="font-medium">{meeting.title}</p>
-                          <div className="flex items-center gap-3 text-sm text-muted-foreground">
-                            <span className="flex items-center gap-1">
-                              <Clock className="h-3 w-3" />
-                              {meeting.time}
-                            </span>
-                            <span>•</span>
-                            <span>{meeting.duration}</span>
-                            <span>•</span>
-                            <span className="flex items-center gap-1">
-                              <Users className="h-3 w-3" />
-                              {meeting.participants}
-                            </span>
+            {/* Search */}
+            <div className="px-3 py-2">
+              <div className="relative">
+                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search..."
+                  value={searchTerm}
+                  onChange={(e) => setSearchTerm(e.target.value)}
+                  className="pl-8 h-8 text-sm bg-background/50 border-border/30"
+                />
+              </div>
+            </div>
+
+            {/* Section toggle */}
+            <div className="flex px-3 gap-1">
+              <button
+                onClick={() => setSidebarSection('channels')}
+                className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                  sidebarSection === 'channels'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <Hash className="h-3 w-3 inline mr-1" />Channels
+              </button>
+              <button
+                onClick={() => setSidebarSection('dms')}
+                className={`flex-1 text-xs font-medium py-1.5 rounded-md transition-colors ${
+                  sidebarSection === 'dms'
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:text-foreground'
+                }`}
+              >
+                <User className="h-3 w-3 inline mr-1" />Direct Messages
+              </button>
+            </div>
+
+            <Separator className="my-2" />
+
+            {/* Channel / DM list */}
+            <ScrollArea className="flex-1">
+              <AnimatePresence mode="wait">
+                {sidebarSection === 'channels' ? (
+                  <motion.div
+                    key="channels"
+                    initial={{ opacity: 0, x: -10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: -10 }}
+                    className="px-2 space-y-0.5"
+                  >
+                    <div className="flex items-center justify-between px-2 py-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Channels</span>
+                      <Dialog open={isChannelDialogOpen} onOpenChange={setIsChannelDialogOpen}>
+                        <DialogTrigger asChild>
+                          <button className="h-5 w-5 rounded flex items-center justify-center hover:bg-muted transition-colors">
+                            <Plus className="h-3.5 w-3.5 text-muted-foreground" />
+                          </button>
+                        </DialogTrigger>
+                        <DialogContent>
+                          <DialogHeader>
+                            <DialogTitle>Create Channel</DialogTitle>
+                          </DialogHeader>
+                          <div className="space-y-4">
+                            <div className="space-y-2">
+                              <Label>Name</Label>
+                              <Input value={channelName} onChange={(e) => setChannelName(e.target.value)} placeholder="e.g. project-updates" />
+                            </div>
+                            <div className="space-y-2">
+                              <Label>Type</Label>
+                              <Select value={channelType} onValueChange={setChannelType}>
+                                <SelectTrigger><SelectValue /></SelectTrigger>
+                                <SelectContent>
+                                  <SelectItem value="public">Public</SelectItem>
+                                  <SelectItem value="private">Private</SelectItem>
+                                </SelectContent>
+                              </Select>
+                            </div>
+                            <Button className="w-full" onClick={handleCreateChannel}>Create</Button>
                           </div>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-3">
-                        <Badge variant="outline" className={meeting.type === 'recurring' ? 'border-primary/30 text-primary' : ''}>
-                          {meeting.type === 'recurring' ? <Calendar className="mr-1 h-3 w-3" /> : null}
-                          {meeting.type}
-                        </Badge>
-                        <Button variant="outline">Join</Button>
-                      </div>
+                        </DialogContent>
+                      </Dialog>
                     </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
+                    {filteredChannels.map((ch) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => { setSelectedChannel(ch); setChatView('channel'); setSelectedDmUser(null); }}
+                        className={`w-full group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${
+                          chatView === 'channel' && selectedChannel?.id === ch.id
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        }`}
+                      >
+                        {ch.type === 'private' ? <Lock className="h-3.5 w-3.5 shrink-0" /> : <Hash className="h-3.5 w-3.5 shrink-0" />}
+                        <span className="truncate">{ch.name}</span>
+                        <DropdownMenu>
+                          <DropdownMenuTrigger asChild>
+                            <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}>
+                              <MoreVertical className="h-3.5 w-3.5" />
+                            </span>
+                          </DropdownMenuTrigger>
+                          <DropdownMenuContent align="end">
+                            <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteChannel(ch.id)}>
+                              <Trash2 className="h-3.5 w-3.5 mr-2" />Delete Channel
+                            </DropdownMenuItem>
+                          </DropdownMenuContent>
+                        </DropdownMenu>
+                      </button>
+                    ))}
+                  </motion.div>
+                ) : (
+                  <motion.div
+                    key="dms"
+                    initial={{ opacity: 0, x: 10 }}
+                    animate={{ opacity: 1, x: 0 }}
+                    exit={{ opacity: 0, x: 10 }}
+                    className="px-2 space-y-0.5"
+                  >
+                    <div className="px-2 py-1">
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">People</span>
+                    </div>
+                    {filteredProfiles.map((p) => (
+                      <button
+                        key={p.id}
+                        onClick={() => { setSelectedDmUser(p); setChatView('dm'); setSelectedChannel(null); }}
+                        className={`w-full flex items-center gap-2.5 rounded-lg px-2 py-1.5 text-sm transition-colors ${
+                          chatView === 'dm' && selectedDmUser?.id === p.id
+                            ? 'bg-primary/10 text-primary font-medium'
+                            : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'
+                        }`}
+                      >
+                        <Avatar className="h-6 w-6">
+                          <AvatarFallback className="bg-primary/10 text-primary text-[10px]">
+                            {getInitials(p.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                        <span className="truncate">{p.full_name || p.email}</span>
+                      </button>
+                    ))}
+                    {filteredProfiles.length === 0 && (
+                      <p className="text-xs text-muted-foreground px-2 py-4 text-center">No users found</p>
+                    )}
+                  </motion.div>
+                )}
+              </AnimatePresence>
+            </ScrollArea>
+          </div>
 
-          <TabsContent value="files">
-            <Card className="card-elevated">
-              <CardHeader className="pb-4">
-                <div className="flex items-center justify-between">
-                  <CardTitle className="text-lg font-semibold">Shared Files</CardTitle>
-                  <Button variant="outline" onClick={() => toast.info('File upload feature coming soon')}>
-                    <Plus className="mr-2 h-4 w-4" />
-                    Upload File
+          {/* Main chat area */}
+          <div className="flex-1 flex flex-col min-w-0">
+            {/* Chat header */}
+            <div className="h-14 border-b border-border/50 flex items-center justify-between px-5 shrink-0">
+              <div className="flex items-center gap-3">
+                <div className="h-8 w-8 rounded-lg bg-primary/10 flex items-center justify-center">
+                  {chatView === 'channel' ? <Hash className="h-4 w-4 text-primary" /> : <User className="h-4 w-4 text-primary" />}
+                </div>
+                <div>
+                  <h3 className="font-semibold text-sm text-foreground">{chatTitle}</h3>
+                  <p className="text-[11px] text-muted-foreground">{chatSubtitle}</p>
+                </div>
+              </div>
+              <div className="flex items-center gap-1">
+                <Button variant="ghost" size="icon" className="h-8 w-8">
+                  <Users className="h-4 w-4" />
+                </Button>
+              </div>
+            </div>
+
+            {/* Messages */}
+            <ScrollArea className="flex-1 px-5">
+              <div className="py-4 space-y-1">
+                {chatView === 'channel' && channelMessages.map((msg, i) => {
+                  const showHeader = i === 0 || channelMessages[i - 1].user_id !== msg.user_id;
+                  const isOwn = msg.user_id === user?.id;
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`group flex gap-3 rounded-lg px-2 py-1 hover:bg-muted/30 transition-colors ${showHeader ? 'mt-3' : ''}`}
+                    >
+                      {showHeader ? (
+                        <Avatar className="h-8 w-8 mt-0.5 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                            {getInitials(msg.profile?.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <div className="w-8 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {showHeader && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground">{msg.profile?.full_name || 'Unknown'}</span>
+                            <span className="text-[11px] text-muted-foreground">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                          </div>
+                        )}
+                        <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
+                      </div>
+                      {isOwn && (
+                        <button
+                          onClick={() => handleDeleteChannelMessage(msg.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })}
+
+                {chatView === 'dm' && directMessages.map((msg, i) => {
+                  const isOwn = msg.sender_id === user?.id;
+                  const senderProfile = isOwn ? null : profiles.find(p => p.id === msg.sender_id);
+                  const showHeader = i === 0 || directMessages[i - 1].sender_id !== msg.sender_id;
+                  return (
+                    <motion.div
+                      key={msg.id}
+                      initial={{ opacity: 0, y: 5 }}
+                      animate={{ opacity: 1, y: 0 }}
+                      className={`group flex gap-3 rounded-lg px-2 py-1 hover:bg-muted/30 transition-colors ${showHeader ? 'mt-3' : ''}`}
+                    >
+                      {showHeader ? (
+                        <Avatar className="h-8 w-8 mt-0.5 shrink-0">
+                          <AvatarFallback className="bg-primary/10 text-primary text-xs">
+                            {isOwn ? getInitials(user?.user_metadata?.full_name) : getInitials(senderProfile?.full_name)}
+                          </AvatarFallback>
+                        </Avatar>
+                      ) : (
+                        <div className="w-8 shrink-0" />
+                      )}
+                      <div className="flex-1 min-w-0">
+                        {showHeader && (
+                          <div className="flex items-center gap-2">
+                            <span className="font-semibold text-sm text-foreground">
+                              {isOwn ? 'You' : (senderProfile?.full_name || 'Unknown')}
+                            </span>
+                            <span className="text-[11px] text-muted-foreground">{format(new Date(msg.created_at), 'h:mm a')}</span>
+                          </div>
+                        )}
+                        <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
+                      </div>
+                      {isOwn && (
+                        <button
+                          onClick={() => handleDeleteDm(msg.id)}
+                          className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10"
+                        >
+                          <Trash2 className="h-3.5 w-3.5 text-destructive" />
+                        </button>
+                      )}
+                    </motion.div>
+                  );
+                })}
+
+                {((chatView === 'channel' && channelMessages.length === 0) || (chatView === 'dm' && directMessages.length === 0)) && (
+                  <div className="flex flex-col items-center justify-center py-20 text-center">
+                    <div className="h-16 w-16 rounded-2xl bg-primary/10 flex items-center justify-center mb-4">
+                      <MessageSquare className="h-8 w-8 text-primary" />
+                    </div>
+                    <h3 className="font-semibold text-foreground">No messages yet</h3>
+                    <p className="text-sm text-muted-foreground mt-1">Start the conversation!</p>
+                  </div>
+                )}
+
+                <div ref={messagesEndRef} />
+              </div>
+            </ScrollArea>
+
+            {/* Input */}
+            {(selectedChannel || selectedDmUser) && (
+              <div className="p-4 border-t border-border/50 shrink-0">
+                <div className="flex items-center gap-2 rounded-xl bg-muted/40 border border-border/30 px-3 py-1.5">
+                  <Input
+                    placeholder={chatView === 'channel' ? `Message #${selectedChannel?.name}` : `Message ${selectedDmUser?.full_name || ''}`}
+                    value={messageInput}
+                    onChange={(e) => setMessageInput(e.target.value)}
+                    onKeyDown={(e) => e.key === 'Enter' && !e.shiftKey && handleSendMessage()}
+                    className="flex-1 border-0 bg-transparent focus-visible:ring-0 focus-visible:ring-offset-0 px-0 h-9"
+                  />
+                  <Button
+                    size="icon"
+                    className="h-8 w-8 rounded-lg gradient-primary text-primary-foreground shrink-0"
+                    onClick={handleSendMessage}
+                    disabled={!messageInput.trim()}
+                  >
+                    <Send className="h-4 w-4" />
                   </Button>
                 </div>
-              </CardHeader>
-              <CardContent>
-                <div className="space-y-3">
-                  {documents.map((doc) => (
-                    <div key={doc.id} className="flex items-center justify-between rounded-lg border bg-card p-4 hover:bg-muted/30 transition-colors">
-                      <div className="flex items-center gap-4">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${
-                          doc.type === 'spreadsheet' ? 'bg-success/10 text-success' :
-                          doc.type === 'pdf' ? 'bg-destructive/10 text-destructive' :
-                          'bg-primary/10 text-primary'
-                        }`}>
-                          {getFileIcon(doc.type)}
-                        </div>
-                        <div>
-                          <p className="font-medium">{doc.name}</p>
-                          <p className="text-sm text-muted-foreground">{doc.size} • Modified {doc.modified}</p>
-                        </div>
-                      </div>
-                      <div className="flex items-center gap-4">
-                        <div className="text-right text-sm">
-                          <p className="text-muted-foreground">by {doc.author}</p>
-                          <p className="text-muted-foreground">Shared with {doc.shared}</p>
-                        </div>
-                        <Button variant="outline" size="sm">Open</Button>
-                      </div>
-                    </div>
-                  ))}
-                </div>
-              </CardContent>
-            </Card>
-          </TabsContent>
-        </Tabs>
+              </div>
+            )}
+          </div>
+        </div>
       </div>
     </MainLayout>
   );
