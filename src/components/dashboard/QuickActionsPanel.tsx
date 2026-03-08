@@ -1,8 +1,10 @@
-import { Plus, FileText, BarChart3, Users, FolderPlus, Bell, Settings } from 'lucide-react';
+import { motion } from 'framer-motion';
+import { Plus, FileText, BarChart3, Users, FolderPlus, Bell } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useNavigate } from 'react-router-dom';
 import { usePushNotifications } from '@/hooks/usePushNotifications';
 import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 
 interface QuickAction {
   id: string;
@@ -10,6 +12,7 @@ interface QuickAction {
   icon: React.ElementType;
   action: () => void;
   color: string;
+  iconColor: string;
 }
 
 export function QuickActionsPanel() {
@@ -17,100 +20,65 @@ export function QuickActionsPanel() {
   const { permission, requestPermission, isSupported } = usePushNotifications();
 
   const handleEnableNotifications = async () => {
-    if (!isSupported) {
-      toast.error('Push notifications are not supported in this browser');
-      return;
-    }
-
-    if (permission === 'granted') {
-      toast.info('Push notifications are already enabled');
-      return;
-    }
-
-    if (permission === 'denied') {
-      toast.error('Push notifications were blocked. Please enable them in your browser settings.');
-      return;
-    }
-
+    if (!isSupported) { toast.error('Push notifications not supported'); return; }
+    if (permission === 'granted') { toast.info('Already enabled'); return; }
+    if (permission === 'denied') { toast.error('Blocked in browser settings'); return; }
     const granted = await requestPermission();
-    if (granted) {
-      toast.success('Push notifications enabled! You\'ll now receive alerts for new tickets.');
-    } else {
-      toast.error('Push notification permission was denied');
-    }
+    granted ? toast.success('Notifications enabled!') : toast.error('Permission denied');
   };
 
   const quickActions: QuickAction[] = [
-    {
-      id: 'new-ticket',
-      label: 'New Ticket',
-      icon: Plus,
-      action: () => navigate('/helpdesk'),
-      color: 'bg-primary/10 text-primary hover:bg-primary/20',
-    },
-    {
-      id: 'view-reports',
-      label: 'View Reports',
-      icon: BarChart3,
-      action: () => navigate('/reports'),
-      color: 'bg-accent/10 text-accent hover:bg-accent/20',
-    },
-    {
-      id: 'browse-directory',
-      label: 'Directory',
-      icon: Users,
-      action: () => navigate('/directory'),
-      color: 'bg-success/10 text-success hover:bg-success/20',
-    },
-    {
-      id: 'new-project',
-      label: 'New Project',
-      icon: FolderPlus,
-      action: () => navigate('/projects'),
-      color: 'bg-warning/10 text-warning hover:bg-warning/20',
-    },
-    {
-      id: 'knowledge-base',
-      label: 'Knowledge',
-      icon: FileText,
-      action: () => navigate('/knowledge'),
-      color: 'bg-secondary/80 text-secondary-foreground hover:bg-secondary',
-    },
+    { id: 'new-ticket', label: 'New Ticket', icon: Plus, action: () => navigate('/helpdesk'), color: 'bg-primary/8 hover:bg-primary/14', iconColor: 'text-primary' },
+    { id: 'view-reports', label: 'Reports', icon: BarChart3, action: () => navigate('/reports'), color: 'bg-accent/8 hover:bg-accent/14', iconColor: 'text-accent' },
+    { id: 'browse-directory', label: 'Directory', icon: Users, action: () => navigate('/directory'), color: 'bg-success/8 hover:bg-success/14', iconColor: 'text-success' },
+    { id: 'new-project', label: 'New Project', icon: FolderPlus, action: () => navigate('/projects'), color: 'bg-warning/8 hover:bg-warning/14', iconColor: 'text-warning' },
+    { id: 'knowledge-base', label: 'Knowledge', icon: FileText, action: () => navigate('/knowledge'), color: 'bg-muted hover:bg-muted/80', iconColor: 'text-muted-foreground' },
     {
       id: 'notifications',
-      label: permission === 'granted' ? 'Notifications On' : 'Enable Alerts',
+      label: permission === 'granted' ? 'Alerts On' : 'Enable Alerts',
       icon: Bell,
       action: handleEnableNotifications,
-      color: permission === 'granted' 
-        ? 'bg-success/10 text-success hover:bg-success/20'
-        : 'bg-muted text-muted-foreground hover:bg-muted/80',
+      color: permission === 'granted' ? 'bg-success/8 hover:bg-success/14' : 'bg-muted hover:bg-muted/80',
+      iconColor: permission === 'granted' ? 'text-success' : 'text-muted-foreground',
     },
   ];
 
   return (
-    <div className="rounded-xl border border-border bg-card">
-      <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Settings className="h-5 w-5 text-primary" />
-          <h3 className="font-display font-semibold text-card-foreground">Quick Actions</h3>
-        </div>
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ duration: 0.4, delay: 0.2 }}
+      className="rounded-2xl border border-border bg-card card-elevated overflow-hidden"
+    >
+      <div className="flex items-center gap-2.5 px-6 py-4 border-b border-border">
+        <div className="h-2 w-2 rounded-full bg-primary animate-float" />
+        <h3 className="font-display text-sm font-semibold text-card-foreground">Quick Actions</h3>
       </div>
-      <div className="grid grid-cols-2 gap-3 p-4 sm:grid-cols-3">
-        {quickActions.map((action) => {
+      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
+        {quickActions.map((action, i) => {
           const Icon = action.icon;
           return (
-            <Button
+            <motion.div
               key={action.id}
-              variant="ghost"
-              className={`flex h-auto flex-col items-center gap-2 rounded-lg p-4 transition-all ${action.color}`}
-              onClick={action.action}
+              initial={{ opacity: 0, scale: 0.95 }}
+              animate={{ opacity: 1, scale: 1 }}
+              transition={{ delay: 0.3 + i * 0.04, duration: 0.3 }}
             >
-              <Icon className="h-5 w-5" />
-              <span className="text-xs font-medium">{action.label}</span>
-            </Button>
+              <Button
+                variant="ghost"
+                className={cn(
+                  'flex h-auto w-full flex-col items-center gap-2 rounded-xl p-4 transition-all duration-200',
+                  action.color
+                )}
+                onClick={action.action}
+              >
+                <Icon className={cn('h-5 w-5', action.iconColor)} />
+                <span className="text-xs font-medium text-card-foreground">{action.label}</span>
+              </Button>
+            </motion.div>
           );
         })}
       </div>
-    </div>
+    </motion.div>
   );
 }
