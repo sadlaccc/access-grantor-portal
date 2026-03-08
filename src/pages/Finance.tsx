@@ -2,8 +2,9 @@ import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
-  TrendingUp, TrendingDown, Loader2, Download, Send
+  TrendingUp, TrendingDown, Loader2, Download, Send, FileDown
 } from 'lucide-react';
+import { generateInvoicePdf, generateExpenseReportPdf } from '@/lib/generateInvoicePdf';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -18,6 +19,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { FileUpload } from '@/components/FileUpload';
 
 interface Invoice {
   id: string;
@@ -78,6 +80,7 @@ const Finance = () => {
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseVendor, setExpenseVendor] = useState('');
   const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseReceipt, setExpenseReceipt] = useState('');
 
   // Budget form state
   const [budgetName, setBudgetName] = useState('');
@@ -191,6 +194,7 @@ const Finance = () => {
         amount: parseFloat(expenseAmount),
         expense_date: expenseDate,
         vendor: expenseVendor || null,
+        receipt_url: expenseReceipt || null,
         status: 'pending',
         created_by: user?.id,
       });
@@ -274,6 +278,7 @@ const Finance = () => {
     setExpenseAmount('');
     setExpenseVendor('');
     setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseReceipt('');
   };
 
   const resetBudgetForm = () => {
@@ -520,6 +525,16 @@ const Finance = () => {
                         <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required />
                       </div>
                     </div>
+                    <div className="space-y-2">
+                      <Label>Receipt (optional)</Label>
+                      <FileUpload
+                        bucket="documents"
+                        folder={`receipts/${user?.id}`}
+                        accept="image/*,application/pdf"
+                        maxSizeMB={10}
+                        onUploadComplete={(url) => setExpenseReceipt(url)}
+                      />
+                    </div>
                     <Button
                       onClick={() => createExpenseMutation.mutate()}
                       className="w-full gradient-primary"
@@ -631,6 +646,21 @@ const Finance = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Download PDF"
+                              onClick={async () => {
+                                // Fetch invoice items for this invoice
+                                const { data: items } = await supabase
+                                  .from('invoice_items')
+                                  .select('*')
+                                  .eq('invoice_id', invoice.id);
+                                generateInvoicePdf({ ...invoice, items: items || [] });
+                              }}
+                            >
+                              <FileDown className="h-3 w-3" />
+                            </Button>
                             {invoice.status === 'draft' && (
                               <Button
                                 size="sm"
@@ -662,8 +692,12 @@ const Finance = () => {
 
           <TabsContent value="expenses">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Expenses</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => generateExpenseReportPdf(expenses)}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
               </CardHeader>
               <CardContent>
                 <Table>

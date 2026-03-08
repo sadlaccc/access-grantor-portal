@@ -12,6 +12,7 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { toast } from 'sonner';
 import { User, Mail, Phone, Building2, Briefcase, Shield, Save, Loader2 } from 'lucide-react';
 import { z } from 'zod';
+import { FileUpload } from '@/components/FileUpload';
 
 const profileSchema = z.object({
   full_name: z.string().trim().max(100, 'Name must be less than 100 characters').nullable(),
@@ -109,6 +110,12 @@ export default function Profile() {
     },
   });
 
+  const handleAvatarUpload = (url: string) => {
+    if (url) {
+      updateProfileMutation.mutate({ avatar_url: url });
+    }
+  };
+
   const handleSaveProfile = () => {
     setErrors({});
     
@@ -169,6 +176,35 @@ export default function Profile() {
         </div>
 
         <div className="space-y-6">
+          {/* Avatar Section */}
+          <Card>
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <User className="h-5 w-5 text-primary" />
+                Profile Photo
+              </CardTitle>
+              <CardDescription>
+                Upload a photo to personalize your profile
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="flex items-center gap-6">
+              <FileUpload
+                bucket="avatars"
+                folder={user?.id}
+                accept="image/png,image/jpeg,image/webp"
+                maxSizeMB={5}
+                variant="avatar"
+                currentUrl={profile?.avatar_url}
+                onUploadComplete={handleAvatarUpload}
+              />
+              <div>
+                <p className="text-sm font-medium text-foreground">{profile?.full_name || 'Your Name'}</p>
+                <p className="text-sm text-muted-foreground">{profile?.email}</p>
+                <p className="text-xs text-muted-foreground mt-1">JPG, PNG or WebP. Max 5MB.</p>
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Profile Information */}
           <Card>
             <CardHeader>
