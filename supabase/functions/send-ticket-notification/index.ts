@@ -122,7 +122,7 @@ const handler = async (req: Request): Promise<Response> => {
     }
 
     const emailResponse = await resend.emails.send({
-      from: "Intellinks Helpdesk <onboarding@resend.dev>",
+      from: "Intellinks Helpdesk <caldas.cheruyot@intellinksea.com>",
       to: recipients,
       subject,
       html: htmlContent,
