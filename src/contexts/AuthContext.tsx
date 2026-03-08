@@ -38,8 +38,10 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
-        fetchProfile(session.user.id);
-        checkAdminRole(session.user.id);
+        Promise.all([
+          fetchProfile(session.user.id),
+          checkAdminRole(session.user.id),
+        ]).finally(() => setLoading(false));
       } else {
         setLoading(false);
       }
