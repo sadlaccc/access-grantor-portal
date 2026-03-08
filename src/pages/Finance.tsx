@@ -632,6 +632,21 @@ const Finance = () => {
                         </TableCell>
                         <TableCell>
                           <div className="flex gap-1">
+                            <Button
+                              size="sm"
+                              variant="ghost"
+                              title="Download PDF"
+                              onClick={async () => {
+                                // Fetch invoice items for this invoice
+                                const { data: items } = await supabase
+                                  .from('invoice_items')
+                                  .select('*')
+                                  .eq('invoice_id', invoice.id);
+                                generateInvoicePdf({ ...invoice, items: items || [] });
+                              }}
+                            >
+                              <FileDown className="h-3 w-3" />
+                            </Button>
                             {invoice.status === 'draft' && (
                               <Button
                                 size="sm"
@@ -663,8 +678,13 @@ const Finance = () => {
 
           <TabsContent value="expenses">
             <Card>
-              <CardHeader>
+              <CardHeader className="flex flex-row items-center justify-between">
                 <CardTitle>Expenses</CardTitle>
+                <Button variant="outline" size="sm" onClick={() => generateExpenseReportPdf(expenses)}>
+                  <FileDown className="h-4 w-4 mr-2" />
+                  Export PDF
+                </Button>
+              </CardHeader>
               </CardHeader>
               <CardContent>
                 <Table>
