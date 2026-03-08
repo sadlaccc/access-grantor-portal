@@ -1,20 +1,38 @@
-import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package } from 'lucide-react';
+import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package, Loader2 } from 'lucide-react';
 import { useState } from 'react';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Badge } from '@/components/ui/badge';
-import { assets } from '@/data/mockData';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
+import { supabase } from '@/integrations/supabase/client';
+import { useAuth } from '@/contexts/AuthContext';
+import { toast } from 'sonner';
 
-const statusColors = {
+interface Asset {
+  id: string;
+  name: string;
+  serial_number: string;
+  type: string;
+  status: string;
+  assigned_to: string | null;
+  purchase_date: string | null;
+  notes: string | null;
+  created_at: string;
+}
+
+const statusColors: Record<string, string> = {
   available: 'bg-success/10 text-success border-success/20',
   assigned: 'bg-accent/10 text-accent border-accent/20',
   maintenance: 'bg-warning/10 text-warning border-warning/20',
   retired: 'bg-muted text-muted-foreground border-muted',
 };
 
-const typeIcons = {
+const typeIcons: Record<string, React.ElementType> = {
   laptop: Laptop,
   desktop: Monitor,
   monitor: Monitor,
@@ -25,43 +43,161 @@ const typeIcons = {
 };
 
 export default function Assets() {
+  const { user } = useAuth();
+  const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
+  const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [name, setName] = useState('');
+  const [serialNumber, setSerialNumber] = useState('');
+  const [type, setType] = useState('laptop');
+  const [status, setStatus] = useState('available');
+
+  const { data: assets = [], isLoading } = useQuery({
+    queryKey: ['it-assets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('it_assets')
+        .select('*')
+        .order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as Asset[];
+    },
+  });
+
+  const { data: profiles = [] } = useQuery({
+    queryKey: ['profiles-for-assets'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('profiles')
+        .select('id, full_name, email');
+      if (error) throw error;
+      return data;
+    },
+  });
+
+  const profileMap = profiles.reduce((acc, p) => {
+    acc[p.id] = p.full_name || p.email;
+    return acc;
+  }, {} as Record<string, string>);
+
+  const createAssetMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('it_assets').insert({
+        name,
+        serial_number: serialNumber || `SN-${Date.now().toString(36).toUpperCase()}`,
+        type,
+        status,
+        created_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['it-assets'] });
+      toast.success('Asset added successfully');
+      setIsDialogOpen(false);
+      setName('');
+      setSerialNumber('');
+      setType('laptop');
+      setStatus('available');
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to add asset: ' + error.message);
+    },
+  });
 
   const filteredAssets = assets.filter(
     (asset) =>
       asset.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      asset.serialNumber.toLowerCase().includes(searchQuery.toLowerCase())
+      asset.serial_number.toLowerCase().includes(searchQuery.toLowerCase())
   );
+
+  const statusCounts = assets.reduce((acc, asset) => {
+    acc[asset.status] = (acc[asset.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
+  if (isLoading) {
+    return (
+      <MainLayout>
+        <div className="flex h-[50vh] items-center justify-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+        </div>
+      </MainLayout>
+    );
+  }
 
   return (
     <MainLayout>
       <div className="p-8">
-        {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">Assets</h1>
             <p className="mt-1 text-muted-foreground">IT asset inventory management</p>
           </div>
-          <Button variant="gradient" className="gap-2">
-            <Plus className="h-4 w-4" />
-            Add Asset
-          </Button>
+          <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
+            <DialogTrigger asChild>
+              <Button variant="gradient" className="gap-2">
+                <Plus className="h-4 w-4" />
+                Add Asset
+              </Button>
+            </DialogTrigger>
+            <DialogContent>
+              <DialogHeader>
+                <DialogTitle>Add New Asset</DialogTitle>
+              </DialogHeader>
+              <div className="space-y-4">
+                <div className="space-y-2">
+                  <Label>Asset Name *</Label>
+                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="MacBook Pro 16&quot;" />
+                </div>
+                <div className="space-y-2">
+                  <Label>Serial Number</Label>
+                  <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Auto-generated if empty" />
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="space-y-2">
+                    <Label>Type</Label>
+                    <Select value={type} onValueChange={setType}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="laptop">Laptop</SelectItem>
+                        <SelectItem value="desktop">Desktop</SelectItem>
+                        <SelectItem value="monitor">Monitor</SelectItem>
+                        <SelectItem value="phone">Phone</SelectItem>
+                        <SelectItem value="tablet">Tablet</SelectItem>
+                        <SelectItem value="accessory">Accessory</SelectItem>
+                        <SelectItem value="software">Software</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                  <div className="space-y-2">
+                    <Label>Status</Label>
+                    <Select value={status} onValueChange={setStatus}>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
+                      <SelectContent>
+                        <SelectItem value="available">Available</SelectItem>
+                        <SelectItem value="assigned">Assigned</SelectItem>
+                        <SelectItem value="maintenance">Maintenance</SelectItem>
+                        <SelectItem value="retired">Retired</SelectItem>
+                      </SelectContent>
+                    </Select>
+                  </div>
+                </div>
+                <Button className="w-full" onClick={() => createAssetMutation.mutate()} disabled={!name || createAssetMutation.isPending}>
+                  {createAssetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                  Add Asset
+                </Button>
+              </div>
+            </DialogContent>
+          </Dialog>
         </div>
 
         {/* Stats */}
         <div className="mb-6 grid gap-4 sm:grid-cols-4">
-          {Object.entries(
-            assets.reduce((acc, asset) => {
-              acc[asset.status] = (acc[asset.status] || 0) + 1;
-              return acc;
-            }, {} as Record<string, number>)
-          ).map(([status, count]) => (
-            <div
-              key={status}
-              className="rounded-xl border border-border bg-card p-4 text-center"
-            >
-              <span className="text-2xl font-bold text-card-foreground">{count}</span>
-              <p className="mt-1 text-sm capitalize text-muted-foreground">{status}</p>
+          {['available', 'assigned', 'maintenance', 'retired'].map((s) => (
+            <div key={s} className="rounded-xl border border-border bg-card p-4 text-center">
+              <span className="text-2xl font-bold text-card-foreground">{statusCounts[s] || 0}</span>
+              <p className="mt-1 text-sm capitalize text-muted-foreground">{s}</p>
             </div>
           ))}
         </div>
@@ -69,51 +205,43 @@ export default function Assets() {
         {/* Search */}
         <div className="mb-6 relative max-w-md">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-          <Input
-            placeholder="Search by name or serial number..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            className="pl-10"
-          />
+          <Input placeholder="Search by name or serial number..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10" />
         </div>
 
         {/* Assets Grid */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
-          {filteredAssets.map((asset, index) => {
-            const Icon = typeIcons[asset.type] || Package;
-            return (
-              <div
-                key={asset.id}
-                className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg animate-slide-up"
-                style={{ animationDelay: `${index * 30}ms` }}
-              >
-                <div className="flex items-start justify-between">
-                  <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
-                    <Icon className="h-6 w-6 text-primary" />
-                  </div>
-                  <Badge variant="outline" className={cn('capitalize', statusColors[asset.status])}>
-                    {asset.status}
-                  </Badge>
-                </div>
-
-                <h3 className="mt-4 font-semibold text-card-foreground">{asset.name}</h3>
-                <p className="mt-1 text-sm text-muted-foreground">{asset.serialNumber}</p>
-
-                {asset.assignedTo && (
-                  <div className="mt-4 flex items-center gap-2">
-                    <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
-                      {asset.assignedTo.name
-                        .split(' ')
-                        .map((n) => n[0])
-                        .join('')}
+        {filteredAssets.length === 0 ? (
+          <div className="text-center py-12 text-muted-foreground">
+            {assets.length === 0 ? 'No assets yet. Add your first asset above.' : 'No assets found matching your search.'}
+          </div>
+        ) : (
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+            {filteredAssets.map((asset, index) => {
+              const Icon = typeIcons[asset.type] || Package;
+              return (
+                <div key={asset.id} className="group rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg animate-slide-up" style={{ animationDelay: `${index * 30}ms` }}>
+                  <div className="flex items-start justify-between">
+                    <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10">
+                      <Icon className="h-6 w-6 text-primary" />
                     </div>
-                    <span className="text-sm text-muted-foreground">{asset.assignedTo.name}</span>
+                    <Badge variant="outline" className={cn('capitalize', statusColors[asset.status])}>
+                      {asset.status}
+                    </Badge>
                   </div>
-                )}
-              </div>
-            );
-          })}
-        </div>
+                  <h3 className="mt-4 font-semibold text-card-foreground">{asset.name}</h3>
+                  <p className="mt-1 text-sm text-muted-foreground">{asset.serial_number}</p>
+                  {asset.assigned_to && profileMap[asset.assigned_to] && (
+                    <div className="mt-4 flex items-center gap-2">
+                      <div className="flex h-6 w-6 items-center justify-center rounded-full bg-primary text-xs font-medium text-primary-foreground">
+                        {profileMap[asset.assigned_to].split(' ').map((n) => n[0]).join('')}
+                      </div>
+                      <span className="text-sm text-muted-foreground">{profileMap[asset.assigned_to]}</span>
+                    </div>
+                  )}
+                </div>
+              );
+            })}
+          </div>
+        )}
       </div>
     </MainLayout>
   );
