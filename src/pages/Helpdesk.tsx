@@ -1,6 +1,7 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Loader2 } from 'lucide-react';
+import { Plus, Search, Loader2, Ticket, AlertCircle } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,7 +15,7 @@ import { toast } from 'sonner';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 
-interface Ticket {
+interface TicketType {
   id: string;
   ticket_number: string;
   title: string;
@@ -35,17 +36,27 @@ interface Profile {
 }
 
 const statusColors: Record<string, string> = {
-  open: 'bg-warning/10 text-warning border-warning/20',
-  'in-progress': 'bg-accent/10 text-accent border-accent/20',
-  resolved: 'bg-success/10 text-success border-success/20',
+  open: 'bg-warning/15 text-warning border-warning/30',
+  'in-progress': 'bg-primary/15 text-primary border-primary/30',
+  resolved: 'bg-success/15 text-success border-success/30',
   closed: 'bg-muted text-muted-foreground border-muted',
 };
 
 const priorityColors: Record<string, string> = {
   low: 'bg-muted text-muted-foreground',
-  medium: 'bg-accent/10 text-accent',
-  high: 'bg-warning/10 text-warning',
-  critical: 'bg-destructive/10 text-destructive',
+  medium: 'bg-primary/15 text-primary',
+  high: 'bg-warning/15 text-warning',
+  critical: 'bg-destructive/15 text-destructive',
+};
+
+const containerVariants = {
+  hidden: { opacity: 0 },
+  show: { opacity: 1, transition: { staggerChildren: 0.04 } },
+};
+
+const rowVariants = {
+  hidden: { opacity: 0, y: 8 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.25 } },
 };
 
 export default function Helpdesk() {
@@ -55,13 +66,11 @@ export default function Helpdesk() {
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
 
-  // Form state
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [priority, setPriority] = useState('medium');
   const [assigneeId, setAssigneeId] = useState<string | null>(null);
 
-  // Fetch tickets
   const { data: tickets = [], isLoading: ticketsLoading } = useQuery({
     queryKey: ['tickets'],
     queryFn: async () => {
@@ -70,11 +79,10 @@ export default function Helpdesk() {
         .select('*')
         .order('created_at', { ascending: false });
       if (error) throw error;
-      return data as Ticket[];
+      return data as TicketType[];
     },
   });
 
-  // Fetch profiles for assignees and creators
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles'],
     queryFn: async () => {
@@ -96,7 +104,6 @@ export default function Helpdesk() {
     return acc;
   }, {} as Record<string, string>);
 
-  // Send notification helper
   const sendNotification = async (payload: {
     type: 'created' | 'status_changed';
     ticketNumber: string;
@@ -109,16 +116,12 @@ export default function Helpdesk() {
     assigneeEmail?: string;
   }) => {
     try {
-      await supabase.functions.invoke('send-ticket-notification', {
-        body: payload,
-      });
-      console.log('Notification sent successfully');
+      await supabase.functions.invoke('send-ticket-notification', { body: payload });
     } catch (error) {
       console.error('Failed to send notification:', error);
     }
   };
 
-  // Create ticket mutation
   const createTicketMutation = useMutation({
     mutationFn: async () => {
       const ticketNumber = `TKT-${Date.now().toString(36).toUpperCase()}`;
@@ -140,7 +143,6 @@ export default function Helpdesk() {
       toast.success('Ticket created successfully');
       setIsCreateDialogOpen(false);
       
-      // Send email notification
       const creatorEmail = user?.id ? profileEmailMap[user.id] : undefined;
       const assigneeEmail = assigneeId ? profileEmailMap[assigneeId] : undefined;
       sendNotification({
@@ -160,7 +162,6 @@ export default function Helpdesk() {
     },
   });
 
-  // Update ticket status mutation
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status, oldStatus }: { ticketId: string; status: string; oldStatus: string }) => {
       const { data, error } = await supabase
@@ -176,7 +177,6 @@ export default function Helpdesk() {
       queryClient.invalidateQueries({ queryKey: ['tickets'] });
       toast.success('Ticket updated');
       
-      // Send email notification
       const creatorEmail = data.created_by ? profileEmailMap[data.created_by] : undefined;
       const assigneeEmail = data.assignee_id ? profileEmailMap[data.assignee_id] : undefined;
       sendNotification({
@@ -209,6 +209,11 @@ export default function Helpdesk() {
     return matchesSearch && matchesStatus;
   });
 
+  const statusCounts = tickets.reduce((acc, t) => {
+    acc[t.status] = (acc[t.status] || 0) + 1;
+    return acc;
+  }, {} as Record<string, number>);
+
   if (ticketsLoading) {
     return (
       <MainLayout>
@@ -221,9 +226,9 @@ export default function Helpdesk() {
 
   return (
     <MainLayout>
-      <div className="p-8">
+      <div className="p-6 lg:p-8 space-y-6">
         {/* Header */}
-        <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">Helpdesk</h1>
             <p className="mt-1 text-muted-foreground">Manage support tickets and requests</p>
@@ -241,30 +246,18 @@ export default function Helpdesk() {
               </DialogHeader>
               <div className="space-y-4">
                 <div className="space-y-2">
-                  <Label>Title</Label>
-                  <Input
-                    value={title}
-                    onChange={(e) => setTitle(e.target.value)}
-                    placeholder="Brief description of the issue"
-                    required
-                  />
+                  <Label>Title *</Label>
+                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Brief description of the issue" />
                 </div>
                 <div className="space-y-2">
                   <Label>Description</Label>
-                  <Textarea
-                    value={description}
-                    onChange={(e) => setDescription(e.target.value)}
-                    placeholder="Detailed description of the issue..."
-                    rows={4}
-                  />
+                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detailed description..." rows={4} />
                 </div>
                 <div className="grid grid-cols-2 gap-4">
                   <div className="space-y-2">
                     <Label>Priority</Label>
                     <Select value={priority} onValueChange={setPriority}>
-                      <SelectTrigger>
-                        <SelectValue />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
                         <SelectItem value="low">Low</SelectItem>
                         <SelectItem value="medium">Medium</SelectItem>
@@ -274,29 +267,19 @@ export default function Helpdesk() {
                     </Select>
                   </div>
                   <div className="space-y-2">
-                    <Label>Assign To (Optional)</Label>
+                    <Label>Assign To</Label>
                     <Select value={assigneeId || ''} onValueChange={(v) => setAssigneeId(v || null)}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Select assignee" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Select assignee" /></SelectTrigger>
                       <SelectContent>
                         {profiles.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>
-                            {profile.full_name || profile.email}
-                          </SelectItem>
+                          <SelectItem key={profile.id} value={profile.id}>{profile.full_name || profile.email}</SelectItem>
                         ))}
                       </SelectContent>
                     </Select>
                   </div>
                 </div>
-                <Button
-                  className="w-full"
-                  onClick={() => createTicketMutation.mutate()}
-                  disabled={!title || createTicketMutation.isPending}
-                >
-                  {createTicketMutation.isPending ? (
-                    <Loader2 className="h-4 w-4 animate-spin mr-2" />
-                  ) : null}
+                <Button className="w-full" onClick={() => createTicketMutation.mutate()} disabled={!title || createTicketMutation.isPending}>
+                  {createTicketMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
                   Create Ticket
                 </Button>
               </div>
@@ -304,115 +287,113 @@ export default function Helpdesk() {
           </Dialog>
         </div>
 
-        {/* Filters */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search tickets..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex gap-2">
-            <Button
-              variant={statusFilter === null ? 'default' : 'outline'}
-              size="sm"
-              onClick={() => setStatusFilter(null)}
+        {/* Stats */}
+        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+          {[
+            { key: 'open', label: 'Open', color: 'bg-warning/10 text-warning' },
+            { key: 'in-progress', label: 'In Progress', color: 'bg-primary/10 text-primary' },
+            { key: 'resolved', label: 'Resolved', color: 'bg-success/10 text-success' },
+            { key: 'closed', label: 'Closed', color: 'bg-muted text-muted-foreground' },
+          ].map(({ key, label, color }, idx) => (
+            <motion.div
+              key={key}
+              initial={{ opacity: 0, y: 10 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: idx * 0.05 }}
+              onClick={() => setStatusFilter(statusFilter === key ? null : key)}
+              className={cn(
+                'rounded-2xl border border-border p-5 text-center cursor-pointer transition-all hover:border-primary/30',
+                color,
+                statusFilter === key && 'ring-2 ring-primary ring-offset-2 ring-offset-background'
+              )}
             >
-              All
-            </Button>
+              <span className="text-3xl font-bold">{statusCounts[key] || 0}</span>
+              <p className="mt-1 text-sm opacity-80">{label}</p>
+            </motion.div>
+          ))}
+        </div>
+
+        {/* Filters */}
+        <div className="flex flex-col gap-4 sm:flex-row sm:items-center">
+          <div className="relative flex-1 max-w-md">
+            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+            <Input placeholder="Search tickets..." value={searchQuery} onChange={(e) => setSearchQuery(e.target.value)} className="pl-10 rounded-xl" />
+          </div>
+          <div className="flex gap-2 flex-wrap">
+            <Button variant={statusFilter === null ? 'default' : 'outline'} size="sm" className="rounded-lg" onClick={() => setStatusFilter(null)}>All</Button>
             {['open', 'in-progress', 'resolved', 'closed'].map((status) => (
-              <Button
-                key={status}
-                variant={statusFilter === status ? 'default' : 'outline'}
-                size="sm"
-                onClick={() => setStatusFilter(status)}
-                className="capitalize"
-              >
-                {status}
+              <Button key={status} variant={statusFilter === status ? 'default' : 'outline'} size="sm" className="rounded-lg capitalize" onClick={() => setStatusFilter(status)}>
+                {status.replace('-', ' ')}
               </Button>
             ))}
           </div>
         </div>
 
         {/* Tickets Table */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
+        <motion.div 
+          variants={containerVariants}
+          initial="hidden"
+          animate="show"
+          className="rounded-2xl border border-border bg-card overflow-hidden"
+        >
           <table className="w-full">
             <thead>
               <tr className="border-b border-border bg-muted/50">
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Ticket
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Priority
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Created By
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Assignee
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  Actions
-                </th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Ticket</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Priority</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Status</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Created By</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assignee</th>
+                <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-border">
               {filteredTickets.length === 0 ? (
                 <tr>
-                  <td colSpan={6} className="px-6 py-12 text-center text-muted-foreground">
-                    No tickets found
+                  <td colSpan={6} className="px-6 py-16 text-center">
+                    <div className="flex flex-col items-center text-muted-foreground">
+                      <Ticket className="h-10 w-10 mb-3 opacity-50" />
+                      {tickets.length === 0 ? 'No tickets yet. Create your first ticket above.' : 'No tickets match your filters.'}
+                    </div>
                   </td>
                 </tr>
               ) : (
-                filteredTickets.map((ticket) => (
-                  <tr
-                    key={ticket.id}
-                    className="transition-colors hover:bg-muted/50"
-                  >
+                filteredTickets.map((ticket, idx) => (
+                  <motion.tr key={ticket.id} variants={rowVariants} className="transition-colors hover:bg-muted/30">
                     <td className="px-6 py-4">
-                      <div>
-                        <span className="text-sm font-medium text-muted-foreground">{ticket.ticket_number}</span>
-                        <p className="font-medium text-card-foreground">{ticket.title}</p>
+                      <div className="flex items-center gap-3">
+                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                          <Ticket className="h-5 w-5 text-primary" />
+                        </div>
+                        <div>
+                          <span className="text-xs font-mono text-muted-foreground">{ticket.ticket_number}</span>
+                          <p className="font-medium text-card-foreground leading-tight">{ticket.title}</p>
+                        </div>
                       </div>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={cn('capitalize', priorityColors[ticket.priority])}>
+                      <Badge variant="outline" className={cn('capitalize text-xs', priorityColors[ticket.priority])}>
+                        {ticket.priority === 'critical' && <AlertCircle className="h-3 w-3 mr-1" />}
                         {ticket.priority}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={cn('capitalize', statusColors[ticket.status])}>
-                        {ticket.status}
+                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[ticket.status])}>
+                        {ticket.status.replace('-', ' ')}
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-card-foreground">
-                        {ticket.created_by ? profileMap[ticket.created_by] || 'Unknown' : '—'}
-                      </span>
+                      <span className="text-sm text-card-foreground">{ticket.created_by ? profileMap[ticket.created_by] || 'Unknown' : '—'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <span className="text-sm text-card-foreground">
-                        {ticket.assignee_id ? profileMap[ticket.assignee_id] || 'Unknown' : '—'}
-                      </span>
+                      <span className="text-sm text-card-foreground">{ticket.assignee_id ? profileMap[ticket.assignee_id] || 'Unknown' : '—'}</span>
                     </td>
                     <td className="px-6 py-4">
                       <Select
                         value={ticket.status}
-                        onValueChange={(newStatus) =>
-                          updateTicketStatusMutation.mutate({ 
-                            ticketId: ticket.id, 
-                            status: newStatus,
-                            oldStatus: ticket.status 
-                          })
-                        }
+                        onValueChange={(newStatus) => updateTicketStatusMutation.mutate({ ticketId: ticket.id, status: newStatus, oldStatus: ticket.status })}
                       >
-                        <SelectTrigger className="w-[130px]">
+                        <SelectTrigger className="w-[130px] rounded-lg">
                           <SelectValue />
                         </SelectTrigger>
                         <SelectContent>
@@ -423,12 +404,12 @@ export default function Helpdesk() {
                         </SelectContent>
                       </Select>
                     </td>
-                  </tr>
+                  </motion.tr>
                 ))
               )}
             </tbody>
           </table>
-        </div>
+        </motion.div>
       </div>
     </MainLayout>
   );

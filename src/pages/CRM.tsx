@@ -1,4 +1,5 @@
 import { useState } from 'react';
+import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,10 +9,9 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Building2, Users, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2,
+  Building2, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -48,6 +48,11 @@ interface Activity {
   completed: boolean;
   created_at: string;
 }
+
+const cardVariants = {
+  hidden: { opacity: 0, y: 12 },
+  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
+};
 
 export default function CRM() {
   const { user } = useAuth();
@@ -136,11 +141,11 @@ export default function CRM() {
   const getStageBadge = (stage: string) => {
     const stages: Record<string, { label: string; className: string }> = {
       discovery: { label: 'Discovery', className: 'bg-muted text-muted-foreground' },
-      qualification: { label: 'Qualification', className: 'bg-primary/20 text-primary border-primary/30' },
-      proposal: { label: 'Proposal', className: 'bg-warning/20 text-warning border-warning/30' },
-      negotiation: { label: 'Negotiation', className: 'bg-accent/20 text-accent border-accent/30' },
-      'closed-won': { label: 'Closed Won', className: 'bg-success/20 text-success border-success/30' },
-      'closed-lost': { label: 'Closed Lost', className: 'bg-destructive/20 text-destructive border-destructive/30' },
+      qualification: { label: 'Qualification', className: 'bg-primary/15 text-primary border-primary/30' },
+      proposal: { label: 'Proposal', className: 'bg-warning/15 text-warning border-warning/30' },
+      negotiation: { label: 'Negotiation', className: 'bg-accent/15 text-accent border-accent/30' },
+      'closed-won': { label: 'Closed Won', className: 'bg-success/15 text-success border-success/30' },
+      'closed-lost': { label: 'Closed Lost', className: 'bg-destructive/15 text-destructive border-destructive/30' },
     };
     const s = stages[stage] || { label: stage, className: 'bg-muted text-muted-foreground' };
     return <Badge className={s.className}>{s.label}</Badge>;
@@ -156,7 +161,7 @@ export default function CRM() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-6 lg:p-8 space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">CRM</h1>
@@ -165,7 +170,7 @@ export default function CRM() {
           <div className="flex gap-2">
             <Dialog open={isDealDialogOpen} onOpenChange={setIsDealDialogOpen}>
               <DialogTrigger asChild>
-                <Button variant="outline"><Handshake className="mr-2 h-4 w-4" />New Deal</Button>
+                <Button variant="outline" className="gap-2"><Handshake className="h-4 w-4" />New Deal</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Create New Deal</DialogTitle></DialogHeader>
@@ -184,7 +189,7 @@ export default function CRM() {
             </Dialog>
             <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
               <DialogTrigger asChild>
-                <Button className="gradient-primary text-primary-foreground"><Plus className="mr-2 h-4 w-4" />New Lead</Button>
+                <Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Lead</Button>
               </DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
@@ -207,33 +212,54 @@ export default function CRM() {
 
         {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
-          <Card className="card-elevated"><CardContent className="p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10"><Target className="h-6 w-6 text-primary" /></div><div><p className="text-2xl font-bold text-foreground">{leads.length}</p><p className="text-sm text-muted-foreground">Active Leads</p></div></div></CardContent></Card>
-          <Card className="card-elevated"><CardContent className="p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-accent/10"><Handshake className="h-6 w-6 text-accent" /></div><div><p className="text-2xl font-bold text-foreground">{deals.length}</p><p className="text-sm text-muted-foreground">Open Deals</p></div></div></CardContent></Card>
-          <Card className="card-elevated"><CardContent className="p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-warning/10"><DollarSign className="h-6 w-6 text-warning" /></div><div><p className="text-2xl font-bold text-foreground">KES {(totalPipeline / 1000).toFixed(0)}K</p><p className="text-sm text-muted-foreground">Pipeline Value</p></div></div></CardContent></Card>
-          <Card className="card-elevated"><CardContent className="p-6"><div className="flex items-center gap-4"><div className="flex h-12 w-12 items-center justify-center rounded-xl bg-success/10"><TrendingUp className="h-6 w-6 text-success" /></div><div><p className="text-2xl font-bold text-foreground">KES {(closedWon / 1000).toFixed(0)}K</p><p className="text-sm text-muted-foreground">Closed Won</p></div></div></CardContent></Card>
+          {[
+            { icon: Target, label: 'Active Leads', value: leads.length, color: 'bg-primary/10 text-primary' },
+            { icon: Handshake, label: 'Open Deals', value: deals.length, color: 'bg-accent/10 text-accent' },
+            { icon: DollarSign, label: 'Pipeline Value', value: `KES ${(totalPipeline / 1000).toFixed(0)}K`, color: 'bg-warning/10 text-warning' },
+            { icon: TrendingUp, label: 'Closed Won', value: `KES ${(closedWon / 1000).toFixed(0)}K`, color: 'bg-success/10 text-success' },
+          ].map((stat, idx) => (
+            <motion.div key={stat.label} variants={cardVariants} initial="hidden" animate="show" transition={{ delay: idx * 0.05 }}>
+              <Card className="card-interactive">
+                <CardContent className="p-5">
+                  <div className="flex items-center gap-4">
+                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}>
+                      <stat.icon className="h-6 w-6" />
+                    </div>
+                    <div>
+                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
+                      <p className="text-sm text-muted-foreground">{stat.label}</p>
+                    </div>
+                  </div>
+                </CardContent>
+              </Card>
+            </motion.div>
+          ))}
         </div>
 
         <Tabs defaultValue="leads" className="space-y-4">
-          <TabsList className="bg-muted/50">
-            <TabsTrigger value="leads" className="flex items-center gap-2"><Target className="h-4 w-4" />Leads</TabsTrigger>
-            <TabsTrigger value="deals" className="flex items-center gap-2"><Handshake className="h-4 w-4" />Deals</TabsTrigger>
-            <TabsTrigger value="activities" className="flex items-center gap-2"><Calendar className="h-4 w-4" />Activities</TabsTrigger>
+          <TabsList className="bg-muted/50 p-1 rounded-xl">
+            <TabsTrigger value="leads" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"><Target className="h-4 w-4" />Leads</TabsTrigger>
+            <TabsTrigger value="deals" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"><Handshake className="h-4 w-4" />Deals</TabsTrigger>
+            <TabsTrigger value="activities" className="flex items-center gap-2 rounded-lg data-[state=active]:bg-background data-[state=active]:shadow-sm"><Calendar className="h-4 w-4" />Activities</TabsTrigger>
           </TabsList>
 
           <TabsContent value="leads">
-            <Card className="card-elevated">
-              <CardHeader className="pb-4">
+            <Card className="rounded-2xl">
+              <CardHeader className="pb-4 border-b border-border">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Lead Pipeline</CardTitle>
                   <div className="relative w-64">
                     <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search leads..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9" />
+                    <Input placeholder="Search leads..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 rounded-xl" />
                   </div>
                 </div>
               </CardHeader>
-              <CardContent>
+              <CardContent className="pt-4">
                 {leads.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No leads yet. Add your first lead above.</div>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    No leads yet. Add your first lead above.
+                  </div>
                 ) : (
                   <Table>
                     <TableHeader><TableRow>
@@ -241,9 +267,22 @@ export default function CRM() {
                     </TableRow></TableHeader>
                     <TableBody>
                       {leads.filter(l => l.company.toLowerCase().includes(searchTerm.toLowerCase()) || l.contact_name.toLowerCase().includes(searchTerm.toLowerCase())).map((lead) => (
-                        <TableRow key={lead.id}>
-                          <TableCell><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10"><Building2 className="h-5 w-5 text-primary" /></div><div><p className="font-medium">{lead.company}</p><p className="text-sm text-muted-foreground">{lead.email}</p></div></div></TableCell>
-                          <TableCell><p className="font-medium">{lead.contact_name}</p><p className="text-sm text-muted-foreground">{lead.phone}</p></TableCell>
+                        <TableRow key={lead.id} className="hover:bg-muted/50 transition-colors">
+                          <TableCell>
+                            <div className="flex items-center gap-3">
+                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
+                                <Building2 className="h-5 w-5 text-primary" />
+                              </div>
+                              <div>
+                                <p className="font-medium">{lead.company}</p>
+                                <p className="text-sm text-muted-foreground">{lead.email}</p>
+                              </div>
+                            </div>
+                          </TableCell>
+                          <TableCell>
+                            <p className="font-medium">{lead.contact_name}</p>
+                            <p className="text-sm text-muted-foreground">{lead.phone}</p>
+                          </TableCell>
                           <TableCell className="font-semibold text-success">KES {lead.estimated_value.toLocaleString()}</TableCell>
                           <TableCell>{getStageBadge(lead.stage)}</TableCell>
                           <TableCell><Badge variant="outline" className="bg-muted/50">{lead.source || '—'}</Badge></TableCell>
@@ -257,11 +296,14 @@ export default function CRM() {
           </TabsContent>
 
           <TabsContent value="deals">
-            <Card className="card-elevated">
-              <CardHeader><CardTitle className="text-lg font-semibold">Deal Pipeline</CardTitle></CardHeader>
-              <CardContent>
+            <Card className="rounded-2xl">
+              <CardHeader className="border-b border-border"><CardTitle className="text-lg font-semibold">Deal Pipeline</CardTitle></CardHeader>
+              <CardContent className="pt-4">
                 {deals.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No deals yet. Create your first deal above.</div>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Handshake className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    No deals yet. Create your first deal above.
+                  </div>
                 ) : (
                   <Table>
                     <TableHeader><TableRow>
@@ -269,12 +311,23 @@ export default function CRM() {
                     </TableRow></TableHeader>
                     <TableBody>
                       {deals.map((deal) => (
-                        <TableRow key={deal.id}>
+                        <TableRow key={deal.id} className="hover:bg-muted/50 transition-colors">
                           <TableCell className="font-medium">{deal.name}</TableCell>
                           <TableCell>{deal.company}</TableCell>
                           <TableCell className="font-semibold text-success">KES {deal.value.toLocaleString()}</TableCell>
                           <TableCell>{getStageBadge(deal.stage)}</TableCell>
-                          <TableCell><div className="flex items-center gap-2"><div className="w-16 h-2 bg-muted rounded-full overflow-hidden"><div className="h-full bg-primary rounded-full" style={{ width: `${deal.probability}%` }} /></div><span className="text-sm">{deal.probability}%</span></div></TableCell>
+                          <TableCell>
+                            <div className="flex items-center gap-2">
+                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
+                                <motion.div 
+                                  initial={{ width: 0 }}
+                                  animate={{ width: `${deal.probability}%` }}
+                                  className="h-full bg-primary rounded-full" 
+                                />
+                              </div>
+                              <span className="text-sm font-medium">{deal.probability}%</span>
+                            </div>
+                          </TableCell>
                           <TableCell className="text-sm">{deal.close_date ? new Date(deal.close_date).toLocaleDateString() : '—'}</TableCell>
                         </TableRow>
                       ))}
@@ -286,24 +339,35 @@ export default function CRM() {
           </TabsContent>
 
           <TabsContent value="activities">
-            <Card className="card-elevated">
-              <CardHeader><CardTitle className="text-lg font-semibold">Scheduled Activities</CardTitle></CardHeader>
-              <CardContent>
+            <Card className="rounded-2xl">
+              <CardHeader className="border-b border-border"><CardTitle className="text-lg font-semibold">Scheduled Activities</CardTitle></CardHeader>
+              <CardContent className="pt-4">
                 {activities.length === 0 ? (
-                  <div className="text-center py-8 text-muted-foreground">No activities scheduled yet.</div>
+                  <div className="text-center py-12 text-muted-foreground">
+                    <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
+                    No activities scheduled yet.
+                  </div>
                 ) : (
                   <div className="space-y-3">
-                    {activities.map((activity) => (
-                      <div key={activity.id} className="flex items-center gap-4 rounded-lg border border-border p-4">
-                        <div className={`flex h-10 w-10 items-center justify-center rounded-lg ${activity.type === 'call' ? 'bg-primary/10' : activity.type === 'email' ? 'bg-accent/10' : 'bg-warning/10'}`}>
+                    {activities.map((activity, idx) => (
+                      <motion.div 
+                        key={activity.id} 
+                        initial={{ opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ delay: idx * 0.05 }}
+                        className="flex items-center gap-4 rounded-xl border border-border p-4 hover:border-primary/20 transition-colors"
+                      >
+                        <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${activity.type === 'call' ? 'bg-primary/10' : activity.type === 'email' ? 'bg-accent/10' : 'bg-warning/10'}`}>
                           {activity.type === 'call' ? <Phone className="h-5 w-5 text-primary" /> : activity.type === 'email' ? <Mail className="h-5 w-5 text-accent" /> : <Calendar className="h-5 w-5 text-warning" />}
                         </div>
                         <div className="flex-1">
                           <p className="font-medium">{activity.description}</p>
                           {activity.scheduled_at && <p className="text-sm text-muted-foreground">{new Date(activity.scheduled_at).toLocaleString()}</p>}
                         </div>
-                        <Badge variant={activity.completed ? 'default' : 'outline'}>{activity.completed ? 'Done' : 'Pending'}</Badge>
-                      </div>
+                        <Badge variant={activity.completed ? 'default' : 'outline'} className={activity.completed ? 'bg-success text-success-foreground' : ''}>
+                          {activity.completed ? 'Done' : 'Pending'}
+                        </Badge>
+                      </motion.div>
                     ))}
                   </div>
                 )}
