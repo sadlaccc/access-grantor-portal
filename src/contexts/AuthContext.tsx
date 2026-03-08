@@ -33,37 +33,53 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const { toast } = useToast();
 
   useEffect(() => {
-    // Get initial session
+    let mounted = true;
+
+    // Set up auth listener FIRST
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(
+      async (_event, session) => {
+        if (!mounted) return;
+        setSession(session);
+        setUser(session?.user ?? null);
+        if (session?.user) {
+          // Use setTimeout to avoid Supabase deadlock
+          setTimeout(async () => {
+            if (!mounted) return;
+            await fetchProfile(session.user.id);
+            await checkAdminRole(session.user.id);
+            if (mounted) setLoading(false);
+          }, 0);
+        } else {
+          setProfile(null);
+          setIsAdmin(false);
+          setLoading(false);
+        }
+      }
+    );
+
+    // Then get initial session
     supabase.auth.getSession().then(({ data: { session } }) => {
+      if (!mounted) return;
       setSession(session);
       setUser(session?.user ?? null);
       if (session?.user) {
         Promise.all([
           fetchProfile(session.user.id),
           checkAdminRole(session.user.id),
-        ]).finally(() => setLoading(false));
+        ]).finally(() => {
+          if (mounted) setLoading(false);
+        });
       } else {
         setLoading(false);
       }
+    }).catch(() => {
+      if (mounted) setLoading(false);
     });
 
-    // Listen for auth changes
-    const { data: { subscription } } = supabase.auth.onAuthStateChange(
-      async (_event, session) => {
-        setSession(session);
-        setUser(session?.user ?? null);
-        if (session?.user) {
-          await fetchProfile(session.user.id);
-          await checkAdminRole(session.user.id);
-        } else {
-          setProfile(null);
-          setIsAdmin(false);
-        }
-        setLoading(false);
-      }
-    );
-
-    return () => subscription.unsubscribe();
+    return () => {
+      mounted = false;
+      subscription.unsubscribe();
+    };
   }, []);
 
   const fetchProfile = async (userId: string) => {
