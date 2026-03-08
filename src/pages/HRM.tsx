@@ -154,7 +154,7 @@ export default function HRM() {
 
   return (
     <MainLayout>
-      <div className="space-y-6">
+      <div className="p-6 lg:p-8 space-y-6">
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">Human Resources</h1>
