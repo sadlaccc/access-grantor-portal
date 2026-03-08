@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import { Bell, Ticket, CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
+import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -25,9 +26,9 @@ const notificationIcons = {
 };
 
 const notificationColors = {
-  ticket_created: 'text-primary',
-  ticket_updated: 'text-warning',
-  ticket_resolved: 'text-success',
+  ticket_created: 'text-primary bg-primary/10',
+  ticket_updated: 'text-warning bg-warning/10',
+  ticket_resolved: 'text-success bg-success/10',
 };
 
 export function NotificationsWidget() {
@@ -36,7 +37,6 @@ export function NotificationsWidget() {
   const { sendNotification, permission } = usePushNotifications();
 
   useEffect(() => {
-    // Fetch initial recent tickets as notifications
     const fetchRecentTickets = async () => {
       const { data: tickets } = await supabase
         .from('tickets')
@@ -61,84 +61,52 @@ export function NotificationsWidget() {
 
     fetchRecentTickets();
 
-    // Subscribe to real-time ticket changes
     const channel = supabase
       .channel('tickets-realtime')
-      .on(
-        'postgres_changes',
-        {
-          event: 'INSERT',
-          schema: 'public',
-          table: 'tickets',
-        },
-        (payload) => {
-          const ticket = payload.new as any;
-          const newNotification: Notification = {
-            id: `ticket-new-${ticket.id}-${Date.now()}`,
-            type: 'ticket_created',
-            title: `New Ticket #${ticket.ticket_number}`,
-            message: ticket.title,
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, (payload) => {
+        const ticket = payload.new as any;
+        const n: Notification = {
+          id: `ticket-new-${ticket.id}-${Date.now()}`,
+          type: 'ticket_created',
+          title: `New Ticket #${ticket.ticket_number}`,
+          message: ticket.title,
+          timestamp: new Date(),
+          read: false,
+          ticketId: ticket.id,
+        };
+        setNotifications((prev) => [n, ...prev.slice(0, 19)]);
+        setUnreadCount((prev) => prev + 1);
+        if (permission === 'granted') {
+          sendNotification(`New Ticket #${ticket.ticket_number}`, { body: ticket.title, tag: `ticket-${ticket.id}` });
+        }
+      })
+      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, (payload) => {
+        const ticket = payload.new as any;
+        const old = payload.old as any;
+        if (ticket.status !== old.status) {
+          const n: Notification = {
+            id: `ticket-update-${ticket.id}-${Date.now()}`,
+            type: ticket.status === 'resolved' ? 'ticket_resolved' : 'ticket_updated',
+            title: `Ticket #${ticket.ticket_number} Updated`,
+            message: `Status changed to ${ticket.status}`,
             timestamp: new Date(),
             read: false,
             ticketId: ticket.id,
           };
-          setNotifications((prev) => [newNotification, ...prev.slice(0, 19)]);
+          setNotifications((prev) => [n, ...prev.slice(0, 19)]);
           setUnreadCount((prev) => prev + 1);
-
-          // Send browser push notification
           if (permission === 'granted') {
-            sendNotification(`New Ticket #${ticket.ticket_number}`, {
-              body: ticket.title,
-              tag: `ticket-${ticket.id}`,
-            });
+            sendNotification(`Ticket #${ticket.ticket_number} Updated`, { body: `Status: ${ticket.status}`, tag: `ticket-update-${ticket.id}` });
           }
         }
-      )
-      .on(
-        'postgres_changes',
-        {
-          event: 'UPDATE',
-          schema: 'public',
-          table: 'tickets',
-        },
-        (payload) => {
-          const ticket = payload.new as any;
-          const oldTicket = payload.old as any;
-          
-          if (ticket.status !== oldTicket.status) {
-            const newNotification: Notification = {
-              id: `ticket-update-${ticket.id}-${Date.now()}`,
-              type: ticket.status === 'resolved' ? 'ticket_resolved' : 'ticket_updated',
-              title: `Ticket #${ticket.ticket_number} Updated`,
-              message: `Status changed to ${ticket.status}`,
-              timestamp: new Date(),
-              read: false,
-              ticketId: ticket.id,
-            };
-            setNotifications((prev) => [newNotification, ...prev.slice(0, 19)]);
-            setUnreadCount((prev) => prev + 1);
-
-            // Send browser push notification for status changes
-            if (permission === 'granted') {
-              sendNotification(`Ticket #${ticket.ticket_number} Updated`, {
-                body: `Status changed to ${ticket.status}`,
-                tag: `ticket-update-${ticket.id}`,
-              });
-            }
-          }
-        }
-      )
+      })
       .subscribe();
 
-    return () => {
-      supabase.removeChannel(channel);
-    };
+    return () => { supabase.removeChannel(channel); };
   }, []);
 
   const markAsRead = (id: string) => {
-    setNotifications((prev) =>
-      prev.map((n) => (n.id === id ? { ...n, read: true } : n))
-    );
+    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
     setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
@@ -147,46 +115,42 @@ export function NotificationsWidget() {
     setUnreadCount(0);
   };
 
-  const dismissNotification = (id: string) => {
-    const notification = notifications.find((n) => n.id === id);
+  const dismiss = (id: string) => {
+    const n = notifications.find((n) => n.id === id);
     setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (notification && !notification.read) {
-      setUnreadCount((prev) => Math.max(0, prev - 1));
-    }
+    if (n && !n.read) setUnreadCount((prev) => Math.max(0, prev - 1));
   };
 
   return (
-    <div className="rounded-xl border border-border bg-card">
+    <motion.div
+      initial={{ opacity: 0, y: 12 }}
+      animate={{ opacity: 1, y: 0 }}
+      transition={{ delay: 0.4, duration: 0.4 }}
+      className="rounded-2xl border border-border bg-card card-elevated overflow-hidden"
+    >
       <div className="flex items-center justify-between border-b border-border px-6 py-4">
-        <div className="flex items-center gap-2">
-          <Bell className="h-5 w-5 text-primary" />
-          <h3 className="font-display font-semibold text-card-foreground">
-            Notifications
-          </h3>
+        <div className="flex items-center gap-2.5">
+          <Bell className="h-4 w-4 text-primary" />
+          <h3 className="font-display text-sm font-semibold text-card-foreground">Notifications</h3>
           {unreadCount > 0 && (
-            <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-xs">
+            <Badge variant="destructive" className="h-5 min-w-5 rounded-full px-1.5 text-[10px]">
               {unreadCount}
             </Badge>
           )}
         </div>
         {unreadCount > 0 && (
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={markAllAsRead}
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
+          <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs text-muted-foreground hover:text-foreground h-7">
             Mark all read
           </Button>
         )}
       </div>
 
-      <ScrollArea className="h-[280px]">
+      <ScrollArea className="h-[300px]">
         {notifications.length === 0 ? (
           <div className="flex h-full items-center justify-center p-6">
             <div className="text-center">
-              <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground/50" />
-              <p className="mt-2 text-sm text-muted-foreground">No notifications yet</p>
+              <AlertCircle className="mx-auto h-8 w-8 text-muted-foreground/30" />
+              <p className="mt-2 text-sm text-muted-foreground">No notifications</p>
             </div>
           </div>
         ) : (
@@ -197,43 +161,29 @@ export function NotificationsWidget() {
                 <div
                   key={notification.id}
                   className={cn(
-                    'group relative flex items-start gap-3 px-6 py-4 transition-colors hover:bg-muted/50',
-                    !notification.read && 'bg-primary/5'
+                    'group relative flex items-start gap-3 px-6 py-4 transition-colors hover:bg-muted/30 cursor-pointer',
+                    !notification.read && 'bg-primary/[0.03]'
                   )}
                   onClick={() => markAsRead(notification.id)}
                 >
-                  <div
-                    className={cn(
-                      'mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-muted',
-                      notificationColors[notification.type]
-                    )}
-                  >
-                    <Icon className="h-4 w-4" />
+                  <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', notificationColors[notification.type])}>
+                    <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
-                      <p className="font-medium text-card-foreground">
-                        {notification.title}
-                      </p>
-                      {!notification.read && (
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                      )}
+                      <p className="text-sm font-medium text-card-foreground">{notification.title}</p>
+                      {!notification.read && <span className="h-1.5 w-1.5 rounded-full bg-primary" />}
                     </div>
-                    <p className="mt-0.5 text-sm text-muted-foreground line-clamp-1">
-                      {notification.message}
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground/70">
+                    <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{notification.message}</p>
+                    <p className="mt-1 text-[10px] text-muted-foreground/60">
                       {formatDistanceToNow(notification.timestamp, { addSuffix: true })}
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
-                    className="h-6 w-6 shrink-0 opacity-0 transition-opacity group-hover:opacity-100"
-                    onClick={(e) => {
-                      e.stopPropagation();
-                      dismissNotification(notification.id);
-                    }}
+                    className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
+                    onClick={(e) => { e.stopPropagation(); dismiss(notification.id); }}
                   >
                     <X className="h-3 w-3" />
                   </Button>
@@ -243,6 +193,6 @@ export function NotificationsWidget() {
           </div>
         )}
       </ScrollArea>
-    </div>
+    </motion.div>
   );
 }

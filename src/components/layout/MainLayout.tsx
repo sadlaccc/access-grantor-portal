@@ -9,8 +9,10 @@ export function MainLayout({ children }: MainLayoutProps) {
   return (
     <div className="min-h-screen bg-background">
       <Sidebar />
-      <main className="ml-64 min-h-screen transition-all duration-300">
-        {children}
+      <main className="ml-[260px] min-h-screen transition-all duration-300">
+        <div className="gradient-mesh min-h-screen">
+          {children}
+        </div>
       </main>
     </div>
   );
