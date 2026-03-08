@@ -1,4 +1,5 @@
 import { Ticket, FolderKanban, Monitor, Users, Loader2 } from 'lucide-react';
+import { useQuery } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { AppCard } from '@/components/dashboard/AppCard';
 import { StatsCard } from '@/components/dashboard/StatsCard';
@@ -8,15 +9,73 @@ import { WelcomeGreeting } from '@/components/dashboard/WelcomeGreeting';
 import { QuickActionsPanel } from '@/components/dashboard/QuickActionsPanel';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
-import { tickets, projects, assets } from '@/data/mockData';
+import { supabase } from '@/integrations/supabase/client';
+import dashboardHero from '@/assets/dashboard-hero.png';
 
 const Index = () => {
   const { profile } = useAuth();
   const { data: apps = [], isLoading } = useApps();
-  
-  const openTickets = tickets.filter((t) => t.status === 'open' || t.status === 'in-progress').length;
-  const activeProjects = projects.filter((p) => p.status === 'active').length;
-  const availableAssets = assets.filter((a) => a.status === 'available').length;
+
+  const { data: ticketCount = 0 } = useQuery({
+    queryKey: ['dashboard-ticket-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('tickets')
+        .select('*', { count: 'exact', head: true })
+        .in('status', ['open', 'in-progress']);
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: projectCount = 0 } = useQuery({
+    queryKey: ['dashboard-project-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('projects')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'active');
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: assetCount = 0 } = useQuery({
+    queryKey: ['dashboard-asset-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('it_assets')
+        .select('*', { count: 'exact', head: true })
+        .eq('status', 'available');
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: userCount = 0 } = useQuery({
+    queryKey: ['dashboard-user-count'],
+    queryFn: async () => {
+      const { count, error } = await supabase
+        .from('profiles')
+        .select('*', { count: 'exact', head: true });
+      if (error) throw error;
+      return count || 0;
+    },
+  });
+
+  const { data: activeProjects = [] } = useQuery({
+    queryKey: ['dashboard-active-projects'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('projects')
+        .select('id, name, description, progress, status')
+        .in('status', ['active', 'planning'])
+        .order('created_at', { ascending: false })
+        .limit(3);
+      if (error) throw error;
+      return data || [];
+    },
+  });
 
   if (isLoading) {
     return (
@@ -38,29 +97,10 @@ const Index = () => {
 
         {/* Stats */}
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard
-            title="Open Tickets"
-            value={openTickets}
-            icon={Ticket}
-            trend={{ value: 12, positive: false }}
-          />
-          <StatsCard
-            title="Active Projects"
-            value={activeProjects}
-            icon={FolderKanban}
-            trend={{ value: 8, positive: true }}
-          />
-          <StatsCard
-            title="Available Assets"
-            value={availableAssets}
-            icon={Monitor}
-          />
-          <StatsCard
-            title="Team Members"
-            value={5}
-            icon={Users}
-            trend={{ value: 2, positive: true }}
-          />
+          <StatsCard title="Open Tickets" value={ticketCount} icon={Ticket} />
+          <StatsCard title="Active Projects" value={projectCount} icon={FolderKanban} />
+          <StatsCard title="Available Assets" value={assetCount} icon={Monitor} />
+          <StatsCard title="Team Members" value={userCount} icon={Users} />
         </div>
 
         {/* Apps Grid */}
@@ -94,21 +134,19 @@ const Index = () => {
         </div>
 
         {/* Active Projects */}
-        <div className="mt-6">
-          <div className="rounded-xl border border-border bg-card">
-            <div className="border-b border-border px-6 py-4">
-              <h3 className="font-display font-semibold text-card-foreground">Active Projects</h3>
-            </div>
-            <div className="divide-y divide-border">
-              {projects
-                .filter((p) => p.status === 'active' || p.status === 'planning')
-                .slice(0, 3)
-                .map((project) => (
+        {activeProjects.length > 0 && (
+          <div className="mt-6">
+            <div className="rounded-xl border border-border bg-card">
+              <div className="border-b border-border px-6 py-4">
+                <h3 className="font-display font-semibold text-card-foreground">Active Projects</h3>
+              </div>
+              <div className="divide-y divide-border">
+                {activeProjects.map((project) => (
                   <div key={project.id} className="px-6 py-4">
                     <div className="flex items-center justify-between">
                       <div>
                         <p className="font-medium text-card-foreground">{project.name}</p>
-                        <p className="text-sm text-muted-foreground">{project.description}</p>
+                        <p className="text-sm text-muted-foreground">{project.description || 'No description'}</p>
                       </div>
                       <div className="text-right">
                         <span className="text-2xl font-bold text-primary">{project.progress}%</span>
@@ -122,9 +160,10 @@ const Index = () => {
                     </div>
                   </div>
                 ))}
+              </div>
             </div>
           </div>
-        </div>
+        )}
       </div>
     </MainLayout>
   );

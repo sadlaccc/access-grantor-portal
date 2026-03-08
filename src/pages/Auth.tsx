@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { useAuth } from '@/contexts/AuthContext';
 import intellinksLogo from '@/assets/intellinks-logo.png';
+import authIllustration from '@/assets/auth-illustration.png';
 
 const Auth = () => {
   const { user, loading, signIn } = useAuth();
@@ -42,8 +43,13 @@ const Auth = () => {
   return (
     <div className="flex min-h-screen">
       {/* Left side - Branding */}
-      <div className="hidden w-1/2 gradient-primary lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12">
-        <div className="max-w-md text-center">
+      <div className="hidden w-1/2 gradient-primary lg:flex lg:flex-col lg:items-center lg:justify-center lg:p-12 relative overflow-hidden">
+        <img 
+          src={authIllustration} 
+          alt="" 
+          className="absolute inset-0 w-full h-full object-cover opacity-20"
+        />
+        <div className="max-w-md text-center relative z-10">
           <div className="mb-8 flex justify-center">
             <div className="flex h-24 w-24 items-center justify-center rounded-2xl bg-white p-3 shadow-lg">
               <img src={intellinksLogo} alt="Intellinks East Africa" className="h-full w-full object-contain" />
@@ -150,7 +156,7 @@ const Auth = () => {
         </Card>
 
         <p className="mt-8 text-center text-sm text-muted-foreground">
-          © 2024 Intellinks East Africa. All rights reserved.
+          © 2026 Intellinks East Africa. All rights reserved.
         </p>
       </div>
     </div>
