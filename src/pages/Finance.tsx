@@ -279,7 +279,7 @@ const Finance = () => {
     setExpenseCategory('');
     setExpenseAmount('');
     setExpenseVendor('');
-    setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseDate(new Date());
     setExpenseReceipt('');
   };
 
