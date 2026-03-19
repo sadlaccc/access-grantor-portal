@@ -46,6 +46,8 @@ const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Product form state
   const [productName, setProductName] = useState('');
