@@ -174,6 +174,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request updated');
+      notifyAllUsers({ title: 'Leave Request Updated', message: 'A leave request status was changed', type: 'update', app: 'hrm', excludeUserId: user?.id });
     },
   });
 
