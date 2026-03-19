@@ -49,6 +49,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!mounted) return;
             await fetchProfile(session.user.id);
             await checkAdminRole(session.user.id);
+            await checkHRRole(session.user.id);
             if (mounted) setLoading(false);
           }, 0);
         } else {
