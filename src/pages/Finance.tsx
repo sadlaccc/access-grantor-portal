@@ -524,7 +524,7 @@ const Finance = () => {
                       </div>
                       <div className="space-y-2">
                         <Label>Date</Label>
-                        <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required />
+                        <DatePicker date={expenseDate} onDateChange={setExpenseDate} placeholder="Select date" />
                       </div>
                     </div>
                     <div className="space-y-2">
