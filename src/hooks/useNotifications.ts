@@ -142,12 +142,12 @@ export async function logAuditAction(params: {
   recordSummary?: string;
   details?: Record<string, unknown>;
 }) {
-  await supabase.from('audit_log').insert({
+  await supabase.from('audit_log').insert([{
     user_id: params.userId,
     action: params.action,
     table_name: params.tableName,
     record_id: params.recordId || null,
     record_summary: params.recordSummary || null,
-    details: params.details || null,
-  });
+    details: (params.details as any) || null,
+  }]);
 }
