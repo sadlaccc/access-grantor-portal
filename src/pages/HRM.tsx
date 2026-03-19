@@ -188,6 +188,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainings'] });
       toast.success('Training created');
+      notifyAllUsers({ title: 'New Training Program', message: trainingName, type: 'create', app: 'hrm', excludeUserId: user?.id });
       setIsTrainingDialogOpen(false);
       setTrainingName(''); setTrainingDesc(''); setTrainingDueDate(undefined);
     },
