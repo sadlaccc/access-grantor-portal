@@ -372,8 +372,8 @@ export default function HRM() {
                     </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Start Date *</Label><Input type="date" value={leaveStart} onChange={(e) => setLeaveStart(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>End Date *</Label><Input type="date" value={leaveEnd} onChange={(e) => setLeaveEnd(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Start Date *</Label><DatePicker date={leaveStart} onDateChange={setLeaveStart} placeholder="Start date" /></div>
+                    <div className="space-y-2"><Label>End Date *</Label><DatePicker date={leaveEnd} onDateChange={setLeaveEnd} placeholder="End date" /></div>
                   </div>
                   <div className="space-y-2"><Label>Reason</Label><Input value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)} placeholder="Optional reason" /></div>
                   <Button className="w-full" onClick={() => createLeaveMutation.mutate()} disabled={!leaveStart || !leaveEnd || createLeaveMutation.isPending}>
