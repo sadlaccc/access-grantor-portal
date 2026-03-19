@@ -1,5 +1,6 @@
 import { useState, useEffect, useRef, useCallback } from 'react';
 import { MainLayout } from '@/components/layout/MainLayout';
+import { Pencil, Check, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -28,7 +29,7 @@ type Profile = { id: string; full_name: string | null; avatar_url: string | null
 type ChatView = 'channel' | 'dm';
 
 export default function Collaboration() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const isMobile = useIsMobile();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
@@ -44,6 +45,8 @@ export default function Collaboration() {
   const [channelType, setChannelType] = useState('public');
   const [sidebarSection, setSidebarSection] = useState<'channels' | 'dms'>('channels');
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editChannelName, setEditChannelName] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
@@ -179,6 +182,16 @@ export default function Collaboration() {
     toast.success('Channel deleted');
   };
 
+  const handleRenameChannel = async (channelId: string) => {
+    if (!editChannelName.trim()) { toast.error('Enter a name'); return; }
+    const { error } = await supabase.from('chat_channels').update({ name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') }).eq('id', channelId);
+    if (error) { toast.error('Failed to rename channel'); return; }
+    setChannels(prev => prev.map(c => c.id === channelId ? { ...c, name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') } : c));
+    if (selectedChannel?.id === channelId) setSelectedChannel(prev => prev ? { ...prev, name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') } : prev);
+    setEditingChannelId(null);
+    toast.success('Channel renamed');
+  };
+
   const getInitials = (name: string | null | undefined) => {
     if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
@@ -242,18 +255,29 @@ export default function Collaboration() {
                 </Dialog>
               </div>
               {filteredChannels.map((ch) => (
+                editingChannelId === ch.id ? (
+                  <div key={ch.id} className="flex items-center gap-1 px-2 py-1">
+                    <Input value={editChannelName} onChange={(e) => setEditChannelName(e.target.value)} className="h-7 text-sm flex-1" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleRenameChannel(ch.id)} />
+                    <button onClick={() => handleRenameChannel(ch.id)} className="h-6 w-6 rounded flex items-center justify-center hover:bg-primary/10"><Check className="h-3.5 w-3.5 text-primary" /></button>
+                    <button onClick={() => setEditingChannelId(null)} className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10"><X className="h-3.5 w-3.5 text-destructive" /></button>
+                  </div>
+                ) : (
                 <button key={ch.id} onClick={() => selectChannel(ch)} className={`w-full group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${chatView === 'channel' && selectedChannel?.id === ch.id ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}>
                   {ch.type === 'private' ? <Lock className="h-3.5 w-3.5 shrink-0" /> : <Hash className="h-3.5 w-3.5 shrink-0" />}
                   <span className="truncate">{ch.name}</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-3.5 w-3.5" /></span>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteChannel(ch.id)}><Trash2 className="h-3.5 w-3.5 mr-2" />Delete Channel</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-3.5 w-3.5" /></span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingChannelId(ch.id); setEditChannelName(ch.name); }}><Pencil className="h-3.5 w-3.5 mr-2" />Rename</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteChannel(ch.id)}><Trash2 className="h-3.5 w-3.5 mr-2" />Delete Channel</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </button>
+                )
               ))}
             </motion.div>
           ) : (
@@ -316,7 +340,7 @@ export default function Collaboration() {
                   )}
                   <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
                 </div>
-                {isOwn && (
+                {(isOwn || isAdmin) && (
                   <button onClick={() => handleDeleteChannelMessage(msg.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </button>
@@ -343,7 +367,7 @@ export default function Collaboration() {
                   )}
                   <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
                 </div>
-                {isOwn && (
+                {(isOwn || isAdmin) && (
                   <button onClick={() => handleDeleteDm(msg.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </button>
