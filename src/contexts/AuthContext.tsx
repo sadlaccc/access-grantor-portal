@@ -16,6 +16,7 @@ interface AuthContextType {
   session: Session | null;
   profile: Profile | null;
   isAdmin: boolean;
+  isHR: boolean;
   loading: boolean;
   signIn: (email: string, password: string) => Promise<void>;
   signUp: (email: string, password: string, fullName: string) => Promise<void>;
@@ -29,6 +30,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [session, setSession] = useState<Session | null>(null);
   const [profile, setProfile] = useState<Profile | null>(null);
   const [isAdmin, setIsAdmin] = useState(false);
+  const [isHR, setIsHR] = useState(false);
   const [loading, setLoading] = useState(true);
   const { toast } = useToast();
 
@@ -47,11 +49,13 @@ export function AuthProvider({ children }: { children: ReactNode }) {
             if (!mounted) return;
             await fetchProfile(session.user.id);
             await checkAdminRole(session.user.id);
+            await checkHRRole(session.user.id);
             if (mounted) setLoading(false);
           }, 0);
         } else {
           setProfile(null);
           setIsAdmin(false);
+          setIsHR(false);
           setLoading(false);
         }
       }
@@ -66,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Promise.all([
           fetchProfile(session.user.id),
           checkAdminRole(session.user.id),
+          checkHRRole(session.user.id),
         ]).finally(() => {
           if (mounted) setLoading(false);
         });
@@ -105,6 +110,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       setIsAdmin(false);
     } else {
       setIsAdmin(data);
+    }
+  };
+
+  const checkHRRole = async (userId: string) => {
+    const { data, error } = await supabase
+      .rpc('has_role', { _user_id: userId, _role: 'hr' });
+
+    if (error) {
+      console.error('Error checking HR role:', error);
+      setIsHR(false);
+    } else {
+      setIsHR(data);
     }
   };
 
@@ -169,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         isAdmin,
+        isHR,
         loading,
         signIn,
         signUp,

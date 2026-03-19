@@ -13,9 +13,11 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { DatePicker } from '@/components/ui/date-picker';
+import { Checkbox } from '@/components/ui/checkbox';
 import {
   Users, Calendar, Clock, Award, Search, Plus, GraduationCap, Loader2,
-  Briefcase, Pencil, Megaphone, Trash2, Bell, Send,
+  Briefcase, Pencil, Megaphone, Trash2, Bell, Send, ClipboardCheck,
+  Star, UserPlus, CheckCircle2, LogIn, LogOut,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -63,15 +65,54 @@ interface Announcement {
   created_at: string;
 }
 
+interface AttendanceRecord {
+  id: string;
+  user_id: string;
+  date: string;
+  check_in: string | null;
+  check_out: string | null;
+  status: string;
+  notes: string | null;
+}
+
+interface PerformanceReview {
+  id: string;
+  employee_id: string;
+  reviewer_id: string;
+  review_period: string;
+  rating: number | null;
+  strengths: string | null;
+  improvements: string | null;
+  goals: string | null;
+  comments: string | null;
+  status: string;
+  created_at: string;
+}
+
+interface OnboardingTask {
+  id: string;
+  employee_id: string;
+  title: string;
+  description: string | null;
+  category: string;
+  is_completed: boolean;
+  due_date: string | null;
+  assigned_by: string | null;
+  completed_at: string | null;
+}
+
 export default function HRM() {
-  const { user, isAdmin } = useAuth();
+  const { user, isAdmin, isHR } = useAuth();
   const queryClient = useQueryClient();
+  const isHROrAdmin = isAdmin || isHR;
   const [searchTerm, setSearchTerm] = useState('');
   const [isLeaveDialogOpen, setIsLeaveDialogOpen] = useState(false);
   const [isTrainingDialogOpen, setIsTrainingDialogOpen] = useState(false);
   const [isAddEmployeeOpen, setIsAddEmployeeOpen] = useState(false);
   const [isEditEmployeeOpen, setIsEditEmployeeOpen] = useState(false);
   const [isAnnouncementOpen, setIsAnnouncementOpen] = useState(false);
+  const [isReviewDialogOpen, setIsReviewDialogOpen] = useState(false);
+  const [isOnboardingDialogOpen, setIsOnboardingDialogOpen] = useState(false);
   const [editingEmployee, setEditingEmployee] = useState<Profile | null>(null);
 
   // Leave form
@@ -103,6 +144,23 @@ export default function HRM() {
   const [annContent, setAnnContent] = useState('');
   const [annCategory, setAnnCategory] = useState('general');
 
+  // Review form
+  const [reviewEmployeeId, setReviewEmployeeId] = useState('');
+  const [reviewPeriod, setReviewPeriod] = useState('');
+  const [reviewRating, setReviewRating] = useState('3');
+  const [reviewStrengths, setReviewStrengths] = useState('');
+  const [reviewImprovements, setReviewImprovements] = useState('');
+  const [reviewGoals, setReviewGoals] = useState('');
+  const [reviewComments, setReviewComments] = useState('');
+
+  // Onboarding form
+  const [onboardEmployeeId, setOnboardEmployeeId] = useState('');
+  const [onboardTitle, setOnboardTitle] = useState('');
+  const [onboardDesc, setOnboardDesc] = useState('');
+  const [onboardCategory, setOnboardCategory] = useState('general');
+  const [onboardDueDate, setOnboardDueDate] = useState<Date | undefined>();
+
+  // --- QUERIES ---
   const { data: profiles = [], isLoading: profilesLoading } = useQuery({
     queryKey: ['hrm-profiles'],
     queryFn: async () => {
@@ -115,7 +173,7 @@ export default function HRM() {
   const { data: leaveRequests = [] } = useQuery({
     queryKey: ['leave-requests'],
     queryFn: async () => {
-      const query = isAdmin
+      const query = isHROrAdmin
         ? supabase.from('leave_requests').select('*').order('created_at', { ascending: false })
         : supabase.from('leave_requests').select('*').eq('user_id', user?.id!).order('created_at', { ascending: false });
       const { data, error } = await query;
@@ -143,9 +201,39 @@ export default function HRM() {
     },
   });
 
+  const { data: attendance = [] } = useQuery({
+    queryKey: ['attendance'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('attendance').select('*').order('date', { ascending: false }).limit(100);
+      if (error) throw error;
+      return data as AttendanceRecord[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: reviews = [] } = useQuery({
+    queryKey: ['performance-reviews'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('performance_reviews').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as PerformanceReview[];
+    },
+    enabled: !!user,
+  });
+
+  const { data: onboardingTasks = [] } = useQuery({
+    queryKey: ['onboarding-tasks'],
+    queryFn: async () => {
+      const { data, error } = await supabase.from('onboarding_tasks').select('*').order('created_at', { ascending: false });
+      if (error) throw error;
+      return data as OnboardingTask[];
+    },
+    enabled: !!user,
+  });
+
   const profileMap = profiles.reduce((acc, p) => { acc[p.id] = p.full_name || p.email; return acc; }, {} as Record<string, string>);
 
-  // Mutations
+  // --- MUTATIONS ---
   const createLeaveMutation = useMutation({
     mutationFn: async () => {
       if (!leaveStart || !leaveEnd) throw new Error('Dates required');
@@ -197,7 +285,6 @@ export default function HRM() {
 
   const addEmployeeMutation = useMutation({
     mutationFn: async () => {
-      const { data: { session } } = await supabase.auth.getSession();
       const res = await supabase.functions.invoke('admin-create-user', {
         body: { email: empEmail, password: empPassword, full_name: empName, department: empDept, job_title: empTitle },
       });
@@ -258,6 +345,87 @@ export default function HRM() {
     },
   });
 
+  // Attendance check-in/out
+  const checkInMutation = useMutation({
+    mutationFn: async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { error } = await supabase.from('attendance').insert({
+        user_id: user?.id!, date: today, check_in: new Date().toISOString(), status: 'present',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Checked in successfully');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const checkOutMutation = useMutation({
+    mutationFn: async () => {
+      const today = format(new Date(), 'yyyy-MM-dd');
+      const { error } = await supabase.from('attendance').update({ check_out: new Date().toISOString() })
+        .eq('user_id', user?.id!).eq('date', today);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['attendance'] });
+      toast.success('Checked out successfully');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Performance review
+  const createReviewMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('performance_reviews').insert({
+        employee_id: reviewEmployeeId, reviewer_id: user?.id!, review_period: reviewPeriod,
+        rating: parseInt(reviewRating), strengths: reviewStrengths || null, improvements: reviewImprovements || null,
+        goals: reviewGoals || null, comments: reviewComments || null, status: 'completed',
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['performance-reviews'] });
+      toast.success('Performance review created');
+      logAuditAction({ userId: user?.id || '', action: 'CREATE', tableName: 'performance_reviews', recordSummary: `Review for ${profileMap[reviewEmployeeId] || 'employee'}` });
+      notifyAllUsers({ title: 'New Performance Review', message: `Review created for ${profileMap[reviewEmployeeId] || 'an employee'}`, type: 'create', app: 'hrm', excludeUserId: user?.id });
+      setIsReviewDialogOpen(false);
+      setReviewEmployeeId(''); setReviewPeriod(''); setReviewRating('3'); setReviewStrengths(''); setReviewImprovements(''); setReviewGoals(''); setReviewComments('');
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  // Onboarding task
+  const createOnboardingMutation = useMutation({
+    mutationFn: async () => {
+      const { error } = await supabase.from('onboarding_tasks').insert({
+        employee_id: onboardEmployeeId, title: onboardTitle, description: onboardDesc || null,
+        category: onboardCategory, due_date: onboardDueDate ? format(onboardDueDate, 'yyyy-MM-dd') : null, assigned_by: user?.id,
+      });
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-tasks'] });
+      toast.success('Onboarding task created');
+      setIsOnboardingDialogOpen(false);
+      setOnboardEmployeeId(''); setOnboardTitle(''); setOnboardDesc(''); setOnboardCategory('general'); setOnboardDueDate(undefined);
+    },
+    onError: (e: Error) => toast.error(e.message),
+  });
+
+  const toggleOnboardingMutation = useMutation({
+    mutationFn: async ({ id, completed }: { id: string; completed: boolean }) => {
+      const { error } = await supabase.from('onboarding_tasks').update({
+        is_completed: completed, completed_at: completed ? new Date().toISOString() : null,
+      }).eq('id', id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['onboarding-tasks'] });
+    },
+  });
+
   const openEditEmployee = (p: Profile) => {
     setEditingEmployee(p);
     setEditName(p.full_name || '');
@@ -287,18 +455,29 @@ export default function HRM() {
     return <Badge className={colors[cat] || colors.general}>{cat}</Badge>;
   };
 
+  const canEditEmployee = (empId: string) => isHROrAdmin || empId === user?.id;
+
+  const todayStr = format(new Date(), 'yyyy-MM-dd');
+  const todayAttendance = attendance.find(a => a.user_id === user?.id && a.date === todayStr);
+  const hasCheckedIn = !!todayAttendance?.check_in;
+  const hasCheckedOut = !!todayAttendance?.check_out;
+
+  // Privacy: employee directory shows limited info for non-HR/admin
+  const getDisplayProfiles = () => {
+    if (isHROrAdmin) return profiles;
+    // Non-HR users see only name and department, no email/phone/title details in directory
+    return profiles;
+  };
+
   if (profilesLoading) {
     return <MainLayout><div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></MainLayout>;
   }
 
-  const filteredProfiles = profiles.filter(p =>
+  const filteredProfiles = getDisplayProfiles().filter(p =>
     (p.full_name?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false) ||
     p.email.toLowerCase().includes(searchTerm.toLowerCase()) ||
     (p.department?.toLowerCase().includes(searchTerm.toLowerCase()) ?? false)
   );
-
-  // Users can edit themselves; admins can edit anyone
-  const canEditEmployee = (empId: string) => isAdmin || empId === user?.id;
 
   return (
     <MainLayout>
@@ -306,37 +485,52 @@ export default function HRM() {
         <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
           <div>
             <h1 className="font-display text-2xl sm:text-3xl font-bold text-foreground">Human Resources</h1>
-            <p className="text-muted-foreground text-sm">Manage employees, attendance, and HR operations</p>
+            <p className="text-muted-foreground text-sm">
+              {isHROrAdmin ? 'Manage employees, attendance, reviews, and HR operations' : 'View your HR information and requests'}
+            </p>
           </div>
           <div className="flex flex-wrap gap-2">
-            <Dialog open={isAnnouncementOpen} onOpenChange={setIsAnnouncementOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2"><Megaphone className="h-4 w-4" />Announce</Button>
-              </DialogTrigger>
-              <DialogContent>
-                <DialogHeader><DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Send Announcement</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2"><Label>Title *</Label><Input value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="e.g. Company Town Hall Meeting" /></div>
-                  <div className="space-y-2"><Label>Category</Label>
-                    <Select value={annCategory} onValueChange={setAnnCategory}><SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="general">General</SelectItem>
-                        <SelectItem value="leave">Leave</SelectItem>
-                        <SelectItem value="training">Training</SelectItem>
-                        <SelectItem value="policy">Policy</SelectItem>
-                        <SelectItem value="urgent">Urgent</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2"><Label>Message *</Label><Textarea value={annContent} onChange={(e) => setAnnContent(e.target.value)} placeholder="Write your announcement..." rows={4} /></div>
-                  <Button className="w-full gap-2" onClick={() => createAnnouncementMutation.mutate()} disabled={!annTitle || !annContent || createAnnouncementMutation.isPending}>
-                    {createAnnouncementMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Send to All Employees
-                  </Button>
-                </div>
-              </DialogContent>
-            </Dialog>
+            {/* Check In / Out */}
+            {!hasCheckedIn ? (
+              <Button variant="outline" className="gap-2 text-success border-success/50 hover:bg-success/10" onClick={() => checkInMutation.mutate()} disabled={checkInMutation.isPending}>
+                <LogIn className="h-4 w-4" />Check In
+              </Button>
+            ) : !hasCheckedOut ? (
+              <Button variant="outline" className="gap-2 text-warning border-warning/50 hover:bg-warning/10" onClick={() => checkOutMutation.mutate()} disabled={checkOutMutation.isPending}>
+                <LogOut className="h-4 w-4" />Check Out
+              </Button>
+            ) : (
+              <Badge className="bg-success/20 text-success border-success/30 h-9 px-3 flex items-center gap-1"><CheckCircle2 className="h-3.5 w-3.5" />Day Complete</Badge>
+            )}
 
-            {isAdmin && (
+            {isHROrAdmin && (
+              <Dialog open={isAnnouncementOpen} onOpenChange={setIsAnnouncementOpen}>
+                <DialogTrigger asChild>
+                  <Button variant="outline" className="gap-2"><Megaphone className="h-4 w-4" />Announce</Button>
+                </DialogTrigger>
+                <DialogContent>
+                  <DialogHeader><DialogTitle className="flex items-center gap-2"><Bell className="h-5 w-5 text-primary" />Send Announcement</DialogTitle></DialogHeader>
+                  <div className="space-y-4">
+                    <div className="space-y-2"><Label>Title *</Label><Input value={annTitle} onChange={(e) => setAnnTitle(e.target.value)} placeholder="e.g. Company Town Hall Meeting" /></div>
+                    <div className="space-y-2"><Label>Category</Label>
+                      <Select value={annCategory} onValueChange={setAnnCategory}><SelectTrigger><SelectValue /></SelectTrigger>
+                        <SelectContent>
+                          <SelectItem value="general">General</SelectItem><SelectItem value="leave">Leave</SelectItem>
+                          <SelectItem value="training">Training</SelectItem><SelectItem value="policy">Policy</SelectItem>
+                          <SelectItem value="urgent">Urgent</SelectItem>
+                        </SelectContent>
+                      </Select>
+                    </div>
+                    <div className="space-y-2"><Label>Message *</Label><Textarea value={annContent} onChange={(e) => setAnnContent(e.target.value)} placeholder="Write your announcement..." rows={4} /></div>
+                    <Button className="w-full gap-2" onClick={() => createAnnouncementMutation.mutate()} disabled={!annTitle || !annContent || createAnnouncementMutation.isPending}>
+                      {createAnnouncementMutation.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : <Send className="h-4 w-4" />}Send to All Employees
+                    </Button>
+                  </div>
+                </DialogContent>
+              </Dialog>
+            )}
+
+            {isHROrAdmin && (
               <Dialog open={isAddEmployeeOpen} onOpenChange={setIsAddEmployeeOpen}>
                 <DialogTrigger asChild>
                   <Button className="gradient-primary text-primary-foreground gap-2"><Plus className="h-4 w-4" />Add Employee</Button>
@@ -369,10 +563,8 @@ export default function HRM() {
                   <div className="space-y-2"><Label>Leave Type</Label>
                     <Select value={leaveType} onValueChange={setLeaveType}><SelectTrigger><SelectValue /></SelectTrigger>
                       <SelectContent>
-                        <SelectItem value="annual">Annual Leave</SelectItem>
-                        <SelectItem value="sick">Sick Leave</SelectItem>
-                        <SelectItem value="wfh">Work From Home</SelectItem>
-                        <SelectItem value="personal">Personal Leave</SelectItem>
+                        <SelectItem value="annual">Annual Leave</SelectItem><SelectItem value="sick">Sick Leave</SelectItem>
+                        <SelectItem value="wfh">Work From Home</SelectItem><SelectItem value="personal">Personal Leave</SelectItem>
                       </SelectContent>
                     </Select>
                   </div>
@@ -393,9 +585,9 @@ export default function HRM() {
         {/* Stats */}
         <div className="grid gap-4 grid-cols-2 lg:grid-cols-4">
           <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-primary/10 shrink-0"><Users className="h-5 w-5 sm:h-6 sm:w-6 text-primary" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">{profiles.length}</p><p className="text-xs sm:text-sm text-muted-foreground">Employees</p></div></div></CardContent></Card>
-          <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-success/10 shrink-0"><Clock className="h-5 w-5 sm:h-6 sm:w-6 text-success" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">98%</p><p className="text-xs sm:text-sm text-muted-foreground">Attendance</p></div></div></CardContent></Card>
+          <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-success/10 shrink-0"><Clock className="h-5 w-5 sm:h-6 sm:w-6 text-success" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">{hasCheckedIn ? 'In' : 'Out'}</p><p className="text-xs sm:text-sm text-muted-foreground">Your Status</p></div></div></CardContent></Card>
           <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-warning/10 shrink-0"><Calendar className="h-5 w-5 sm:h-6 sm:w-6 text-warning" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">{leaveRequests.filter(l => l.status === 'pending').length}</p><p className="text-xs sm:text-sm text-muted-foreground">Pending Leaves</p></div></div></CardContent></Card>
-          <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-accent/10 shrink-0"><Megaphone className="h-5 w-5 sm:h-6 sm:w-6 text-accent" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">{announcements.length}</p><p className="text-xs sm:text-sm text-muted-foreground">Announcements</p></div></div></CardContent></Card>
+          <Card className="card-elevated"><CardContent className="p-4 sm:p-6"><div className="flex items-center gap-3 sm:gap-4"><div className="flex h-10 w-10 sm:h-12 sm:w-12 items-center justify-center rounded-xl bg-accent/10 shrink-0"><Star className="h-5 w-5 sm:h-6 sm:w-6 text-accent" /></div><div><p className="text-xl sm:text-2xl font-bold text-foreground">{reviews.length}</p><p className="text-xs sm:text-sm text-muted-foreground">Reviews</p></div></div></CardContent></Card>
         </div>
 
         <Tabs defaultValue="employees" className="space-y-4">
@@ -403,7 +595,10 @@ export default function HRM() {
             <TabsTrigger value="employees" className="flex items-center gap-2"><Users className="h-4 w-4" /><span className="hidden sm:inline">Employees</span></TabsTrigger>
             <TabsTrigger value="announcements" className="flex items-center gap-2"><Megaphone className="h-4 w-4" /><span className="hidden sm:inline">Announcements</span></TabsTrigger>
             <TabsTrigger value="leave" className="flex items-center gap-2"><Calendar className="h-4 w-4" /><span className="hidden sm:inline">Leave</span></TabsTrigger>
+            <TabsTrigger value="attendance" className="flex items-center gap-2"><Clock className="h-4 w-4" /><span className="hidden sm:inline">Attendance</span></TabsTrigger>
             <TabsTrigger value="training" className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /><span className="hidden sm:inline">Training</span></TabsTrigger>
+            {isHROrAdmin && <TabsTrigger value="reviews" className="flex items-center gap-2"><Star className="h-4 w-4" /><span className="hidden sm:inline">Reviews</span></TabsTrigger>}
+            <TabsTrigger value="onboarding" className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">Onboarding</span></TabsTrigger>
           </TabsList>
 
           {/* Employees Tab */}
@@ -422,7 +617,11 @@ export default function HRM() {
                 <div className="overflow-x-auto">
                   <Table>
                     <TableHeader><TableRow>
-                      <TableHead>Employee</TableHead><TableHead className="hidden md:table-cell">Department</TableHead><TableHead className="hidden md:table-cell">Role</TableHead><TableHead className="hidden lg:table-cell">Phone</TableHead><TableHead>Actions</TableHead>
+                      <TableHead>Employee</TableHead>
+                      <TableHead className="hidden md:table-cell">Department</TableHead>
+                      {isHROrAdmin && <TableHead className="hidden md:table-cell">Role</TableHead>}
+                      {isHROrAdmin && <TableHead className="hidden lg:table-cell">Phone</TableHead>}
+                      <TableHead>Actions</TableHead>
                     </TableRow></TableHeader>
                     <TableBody>
                       {filteredProfiles.map((profile) => (
@@ -434,14 +633,17 @@ export default function HRM() {
                               </div>
                               <div className="min-w-0">
                                 <p className="font-medium truncate">{profile.full_name || 'Unknown'}</p>
-                                <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
-                                <p className="text-xs text-muted-foreground md:hidden">{profile.department || '—'} · {profile.job_title || '—'}</p>
+                                {isHROrAdmin ? (
+                                  <p className="text-xs text-muted-foreground truncate">{profile.email}</p>
+                                ) : (
+                                  <p className="text-xs text-muted-foreground">{profile.department || '—'}</p>
+                                )}
                               </div>
                             </div>
                           </TableCell>
                           <TableCell className="hidden md:table-cell"><Badge variant="outline" className="bg-muted/50"><Briefcase className="mr-1 h-3 w-3" />{profile.department || '—'}</Badge></TableCell>
-                          <TableCell className="hidden md:table-cell capitalize">{profile.job_title || '—'}</TableCell>
-                          <TableCell className="hidden lg:table-cell text-sm">{profile.phone || '—'}</TableCell>
+                          {isHROrAdmin && <TableCell className="hidden md:table-cell capitalize">{profile.job_title || '—'}</TableCell>}
+                          {isHROrAdmin && <TableCell className="hidden lg:table-cell text-sm">{profile.phone || '—'}</TableCell>}
                           <TableCell>
                             {canEditEmployee(profile.id) && (
                               <Button variant="ghost" size="icon" className="h-8 w-8" onClick={() => openEditEmployee(profile)}>
@@ -471,7 +673,6 @@ export default function HRM() {
                   <div className="text-center py-12 text-muted-foreground">
                     <Megaphone className="h-12 w-12 mx-auto mb-3 opacity-30" />
                     <p>No announcements yet</p>
-                    <p className="text-sm mt-1">Use the Announce button to notify all employees</p>
                   </div>
                 ) : (
                   <ScrollArea className="max-h-[600px]">
@@ -493,7 +694,7 @@ export default function HRM() {
                                 <span>{format(new Date(ann.created_at), 'MMM d, yyyy h:mm a')}</span>
                               </div>
                             </div>
-                            {(isAdmin || ann.created_by === user?.id) && (
+                            {(isHROrAdmin || ann.created_by === user?.id) && (
                               <Button variant="ghost" size="icon" className="h-8 w-8 opacity-0 group-hover:opacity-100 transition-opacity shrink-0"
                                 onClick={() => deleteAnnouncementMutation.mutate(ann.id)}
                               >
@@ -513,7 +714,9 @@ export default function HRM() {
           {/* Leave Tab */}
           <TabsContent value="leave">
             <Card className="card-elevated">
-              <CardHeader><CardTitle className="text-lg font-semibold">Leave Requests</CardTitle></CardHeader>
+              <CardHeader><CardTitle className="text-lg font-semibold">
+                {isHROrAdmin ? 'All Leave Requests' : 'My Leave Requests'}
+              </CardTitle></CardHeader>
               <CardContent>
                 {leaveRequests.length === 0 ? (
                   <div className="text-center py-8 text-muted-foreground">No leave requests yet.</div>
@@ -521,18 +724,18 @@ export default function HRM() {
                   <div className="overflow-x-auto">
                     <Table>
                       <TableHeader><TableRow>
-                        <TableHead>Employee</TableHead><TableHead>Type</TableHead><TableHead className="hidden sm:table-cell">From</TableHead><TableHead className="hidden sm:table-cell">To</TableHead><TableHead>Days</TableHead><TableHead>Status</TableHead>{isAdmin && <TableHead>Actions</TableHead>}
+                        {isHROrAdmin && <TableHead>Employee</TableHead>}<TableHead>Type</TableHead><TableHead className="hidden sm:table-cell">From</TableHead><TableHead className="hidden sm:table-cell">To</TableHead><TableHead>Days</TableHead><TableHead>Status</TableHead>{isHROrAdmin && <TableHead>Actions</TableHead>}
                       </TableRow></TableHeader>
                       <TableBody>
                         {leaveRequests.map((leave) => (
                           <TableRow key={leave.id}>
-                            <TableCell className="font-medium">{profileMap[leave.user_id] || 'Unknown'}</TableCell>
+                            {isHROrAdmin && <TableCell className="font-medium">{profileMap[leave.user_id] || 'Unknown'}</TableCell>}
                             <TableCell className="capitalize text-sm">{leave.leave_type.replace('_', ' ')}</TableCell>
                             <TableCell className="hidden sm:table-cell text-sm">{leave.start_date}</TableCell>
                             <TableCell className="hidden sm:table-cell text-sm">{leave.end_date}</TableCell>
                             <TableCell>{leave.days}</TableCell>
                             <TableCell>{getStatusBadge(leave.status)}</TableCell>
-                            {isAdmin && (
+                            {isHROrAdmin && (
                               <TableCell>
                                 {leave.status === 'pending' && (
                                   <div className="flex gap-1">
@@ -552,28 +755,66 @@ export default function HRM() {
             </Card>
           </TabsContent>
 
+          {/* Attendance Tab */}
+          <TabsContent value="attendance">
+            <Card className="card-elevated">
+              <CardHeader><CardTitle className="text-lg font-semibold flex items-center gap-2"><Clock className="h-5 w-5 text-primary" />{isHROrAdmin ? 'All Attendance Records' : 'My Attendance'}</CardTitle></CardHeader>
+              <CardContent>
+                {attendance.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">No attendance records yet. Use the Check In button to start.</div>
+                ) : (
+                  <div className="overflow-x-auto">
+                    <Table>
+                      <TableHeader><TableRow>
+                        {isHROrAdmin && <TableHead>Employee</TableHead>}
+                        <TableHead>Date</TableHead><TableHead>Check In</TableHead><TableHead>Check Out</TableHead><TableHead>Status</TableHead>
+                      </TableRow></TableHeader>
+                      <TableBody>
+                        {attendance.map((record) => (
+                          <TableRow key={record.id}>
+                            {isHROrAdmin && <TableCell className="font-medium">{profileMap[record.user_id] || 'Unknown'}</TableCell>}
+                            <TableCell>{record.date}</TableCell>
+                            <TableCell>{record.check_in ? format(new Date(record.check_in), 'h:mm a') : '—'}</TableCell>
+                            <TableCell>{record.check_out ? format(new Date(record.check_out), 'h:mm a') : '—'}</TableCell>
+                            <TableCell>
+                              <Badge className={record.status === 'present' ? 'bg-success/20 text-success border-success/30' : 'bg-warning/20 text-warning border-warning/30'}>
+                                {record.status}
+                              </Badge>
+                            </TableCell>
+                          </TableRow>
+                        ))}
+                      </TableBody>
+                    </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
           {/* Training Tab */}
           <TabsContent value="training">
             <Card className="card-elevated">
               <CardHeader>
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Training Programs</CardTitle>
-                  <Dialog open={isTrainingDialogOpen} onOpenChange={setIsTrainingDialogOpen}>
-                    <DialogTrigger asChild>
-                      <Button className="gradient-primary text-primary-foreground gap-2"><Plus className="h-4 w-4" />Create Training</Button>
-                    </DialogTrigger>
-                    <DialogContent>
-                      <DialogHeader><DialogTitle>Create New Training</DialogTitle></DialogHeader>
-                      <div className="space-y-4">
-                        <div className="space-y-2"><Label>Training Name *</Label><Input value={trainingName} onChange={(e) => setTrainingName(e.target.value)} placeholder="Cybersecurity Basics" /></div>
-                        <div className="space-y-2"><Label>Description</Label><Textarea value={trainingDesc} onChange={(e) => setTrainingDesc(e.target.value)} placeholder="Describe the training..." rows={3} /></div>
-                        <div className="space-y-2"><Label>Due Date</Label><DatePicker date={trainingDueDate} onDateChange={setTrainingDueDate} placeholder="Select due date" /></div>
-                        <Button className="w-full" onClick={() => createTrainingMutation.mutate()} disabled={!trainingName || createTrainingMutation.isPending}>
-                          {createTrainingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Training
-                        </Button>
-                      </div>
-                    </DialogContent>
-                  </Dialog>
+                  {isHROrAdmin && (
+                    <Dialog open={isTrainingDialogOpen} onOpenChange={setIsTrainingDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="gradient-primary text-primary-foreground gap-2"><Plus className="h-4 w-4" />Create Training</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Create New Training</DialogTitle></DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2"><Label>Training Name *</Label><Input value={trainingName} onChange={(e) => setTrainingName(e.target.value)} placeholder="Cybersecurity Basics" /></div>
+                          <div className="space-y-2"><Label>Description</Label><Textarea value={trainingDesc} onChange={(e) => setTrainingDesc(e.target.value)} placeholder="Describe the training..." rows={3} /></div>
+                          <div className="space-y-2"><Label>Due Date</Label><DatePicker date={trainingDueDate} onDateChange={setTrainingDueDate} placeholder="Select due date" /></div>
+                          <Button className="w-full" onClick={() => createTrainingMutation.mutate()} disabled={!trainingName || createTrainingMutation.isPending}>
+                            {createTrainingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Training
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -604,6 +845,153 @@ export default function HRM() {
                         ))}
                       </TableBody>
                     </Table>
+                  </div>
+                )}
+              </CardContent>
+            </Card>
+          </TabsContent>
+
+          {/* Performance Reviews Tab (HR/Admin only) */}
+          {isHROrAdmin && (
+            <TabsContent value="reviews">
+              <Card className="card-elevated">
+                <CardHeader>
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-semibold flex items-center gap-2"><Star className="h-5 w-5 text-primary" />Performance Reviews</CardTitle>
+                    <Dialog open={isReviewDialogOpen} onOpenChange={setIsReviewDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="gradient-primary text-primary-foreground gap-2"><Plus className="h-4 w-4" />New Review</Button>
+                      </DialogTrigger>
+                      <DialogContent className="max-w-lg">
+                        <DialogHeader><DialogTitle>Create Performance Review</DialogTitle></DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2"><Label>Employee *</Label>
+                            <Select value={reviewEmployeeId} onValueChange={setReviewEmployeeId}><SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                              <SelectContent>{profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2"><Label>Review Period *</Label><Input value={reviewPeriod} onChange={(e) => setReviewPeriod(e.target.value)} placeholder="e.g. Q1 2026" /></div>
+                          <div className="space-y-2"><Label>Rating (1-5) *</Label>
+                            <Select value={reviewRating} onValueChange={setReviewRating}><SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="1">1 - Needs Improvement</SelectItem><SelectItem value="2">2 - Below Expectations</SelectItem>
+                                <SelectItem value="3">3 - Meets Expectations</SelectItem><SelectItem value="4">4 - Exceeds Expectations</SelectItem>
+                                <SelectItem value="5">5 - Outstanding</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2"><Label>Strengths</Label><Textarea value={reviewStrengths} onChange={(e) => setReviewStrengths(e.target.value)} rows={2} /></div>
+                          <div className="space-y-2"><Label>Areas for Improvement</Label><Textarea value={reviewImprovements} onChange={(e) => setReviewImprovements(e.target.value)} rows={2} /></div>
+                          <div className="space-y-2"><Label>Goals</Label><Textarea value={reviewGoals} onChange={(e) => setReviewGoals(e.target.value)} rows={2} /></div>
+                          <div className="space-y-2"><Label>Comments</Label><Textarea value={reviewComments} onChange={(e) => setReviewComments(e.target.value)} rows={2} /></div>
+                          <Button className="w-full" onClick={() => createReviewMutation.mutate()} disabled={!reviewEmployeeId || !reviewPeriod || createReviewMutation.isPending}>
+                            {createReviewMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Submit Review
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  </div>
+                </CardHeader>
+                <CardContent>
+                  {reviews.length === 0 ? (
+                    <div className="text-center py-8 text-muted-foreground">No performance reviews yet.</div>
+                  ) : (
+                    <div className="overflow-x-auto">
+                      <Table>
+                        <TableHeader><TableRow>
+                          <TableHead>Employee</TableHead><TableHead>Period</TableHead><TableHead>Rating</TableHead><TableHead>Reviewer</TableHead><TableHead>Status</TableHead><TableHead className="hidden md:table-cell">Date</TableHead>
+                        </TableRow></TableHeader>
+                        <TableBody>
+                          {reviews.map((review) => (
+                            <TableRow key={review.id}>
+                              <TableCell className="font-medium">{profileMap[review.employee_id] || 'Unknown'}</TableCell>
+                              <TableCell>{review.review_period}</TableCell>
+                              <TableCell>
+                                <div className="flex items-center gap-1">
+                                  {Array.from({ length: 5 }).map((_, i) => (
+                                    <Star key={i} className={`h-3.5 w-3.5 ${i < (review.rating || 0) ? 'text-warning fill-warning' : 'text-muted'}`} />
+                                  ))}
+                                </div>
+                              </TableCell>
+                              <TableCell>{profileMap[review.reviewer_id] || 'Unknown'}</TableCell>
+                              <TableCell><Badge variant="outline" className="capitalize">{review.status}</Badge></TableCell>
+                              <TableCell className="hidden md:table-cell text-sm">{format(new Date(review.created_at), 'MMM d, yyyy')}</TableCell>
+                            </TableRow>
+                          ))}
+                        </TableBody>
+                      </Table>
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </TabsContent>
+          )}
+
+          {/* Onboarding Tab */}
+          <TabsContent value="onboarding">
+            <Card className="card-elevated">
+              <CardHeader>
+                <div className="flex items-center justify-between">
+                  <CardTitle className="text-lg font-semibold flex items-center gap-2"><ClipboardCheck className="h-5 w-5 text-primary" />{isHROrAdmin ? 'Onboarding Management' : 'My Onboarding Tasks'}</CardTitle>
+                  {isHROrAdmin && (
+                    <Dialog open={isOnboardingDialogOpen} onOpenChange={setIsOnboardingDialogOpen}>
+                      <DialogTrigger asChild>
+                        <Button className="gradient-primary text-primary-foreground gap-2"><Plus className="h-4 w-4" />Add Task</Button>
+                      </DialogTrigger>
+                      <DialogContent>
+                        <DialogHeader><DialogTitle>Create Onboarding Task</DialogTitle></DialogHeader>
+                        <div className="space-y-4">
+                          <div className="space-y-2"><Label>Employee *</Label>
+                            <Select value={onboardEmployeeId} onValueChange={setOnboardEmployeeId}><SelectTrigger><SelectValue placeholder="Select employee" /></SelectTrigger>
+                              <SelectContent>{profiles.map(p => <SelectItem key={p.id} value={p.id}>{p.full_name || p.email}</SelectItem>)}</SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2"><Label>Task Title *</Label><Input value={onboardTitle} onChange={(e) => setOnboardTitle(e.target.value)} placeholder="e.g. Complete IT setup" /></div>
+                          <div className="space-y-2"><Label>Description</Label><Textarea value={onboardDesc} onChange={(e) => setOnboardDesc(e.target.value)} rows={2} /></div>
+                          <div className="space-y-2"><Label>Category</Label>
+                            <Select value={onboardCategory} onValueChange={setOnboardCategory}><SelectTrigger><SelectValue /></SelectTrigger>
+                              <SelectContent>
+                                <SelectItem value="general">General</SelectItem><SelectItem value="it">IT Setup</SelectItem>
+                                <SelectItem value="hr">HR Paperwork</SelectItem><SelectItem value="training">Training</SelectItem>
+                                <SelectItem value="team">Team Introduction</SelectItem>
+                              </SelectContent>
+                            </Select>
+                          </div>
+                          <div className="space-y-2"><Label>Due Date</Label><DatePicker date={onboardDueDate} onDateChange={setOnboardDueDate} placeholder="Select due date" /></div>
+                          <Button className="w-full" onClick={() => createOnboardingMutation.mutate()} disabled={!onboardEmployeeId || !onboardTitle || createOnboardingMutation.isPending}>
+                            {createOnboardingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Task
+                          </Button>
+                        </div>
+                      </DialogContent>
+                    </Dialog>
+                  )}
+                </div>
+              </CardHeader>
+              <CardContent>
+                {onboardingTasks.length === 0 ? (
+                  <div className="text-center py-8 text-muted-foreground">
+                    <UserPlus className="h-12 w-12 mx-auto mb-3 opacity-30" />
+                    <p>No onboarding tasks</p>
+                  </div>
+                ) : (
+                  <div className="space-y-3">
+                    {onboardingTasks.map((task) => (
+                      <div key={task.id} className="flex items-center gap-3 rounded-lg border border-border/50 p-3 hover:bg-muted/30 transition-colors">
+                        <Checkbox
+                          checked={task.is_completed}
+                          onCheckedChange={(checked) => toggleOnboardingMutation.mutate({ id: task.id, completed: !!checked })}
+                        />
+                        <div className="flex-1 min-w-0">
+                          <p className={`font-medium ${task.is_completed ? 'line-through text-muted-foreground' : 'text-foreground'}`}>{task.title}</p>
+                          <div className="flex items-center gap-2 mt-1 flex-wrap">
+                            {isHROrAdmin && <span className="text-xs text-muted-foreground">{profileMap[task.employee_id] || 'Unknown'}</span>}
+                            <Badge variant="outline" className="text-xs capitalize">{task.category}</Badge>
+                            {task.due_date && <span className="text-xs text-muted-foreground">Due: {task.due_date}</span>}
+                          </div>
+                        </div>
+                        {task.is_completed && <CheckCircle2 className="h-5 w-5 text-success shrink-0" />}
+                      </div>
+                    ))}
                   </div>
                 )}
               </CardContent>

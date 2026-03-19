@@ -74,6 +74,39 @@ export type Database = {
         }
         Relationships: []
       }
+      attendance: {
+        Row: {
+          check_in: string | null
+          check_out: string | null
+          created_at: string | null
+          date: string
+          id: string
+          notes: string | null
+          status: string
+          user_id: string
+        }
+        Insert: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          user_id: string
+        }
+        Update: {
+          check_in?: string | null
+          check_out?: string | null
+          created_at?: string | null
+          date?: string
+          id?: string
+          notes?: string | null
+          status?: string
+          user_id?: string
+        }
+        Relationships: []
+      }
       audit_log: {
         Row: {
           action: string
@@ -837,6 +870,90 @@ export type Database = {
         }
         Relationships: []
       }
+      onboarding_tasks: {
+        Row: {
+          assigned_by: string | null
+          category: string
+          completed_at: string | null
+          created_at: string | null
+          description: string | null
+          due_date: string | null
+          employee_id: string
+          id: string
+          is_completed: boolean | null
+          title: string
+        }
+        Insert: {
+          assigned_by?: string | null
+          category?: string
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          employee_id: string
+          id?: string
+          is_completed?: boolean | null
+          title: string
+        }
+        Update: {
+          assigned_by?: string | null
+          category?: string
+          completed_at?: string | null
+          created_at?: string | null
+          description?: string | null
+          due_date?: string | null
+          employee_id?: string
+          id?: string
+          is_completed?: boolean | null
+          title?: string
+        }
+        Relationships: []
+      }
+      performance_reviews: {
+        Row: {
+          comments: string | null
+          created_at: string | null
+          employee_id: string
+          goals: string | null
+          id: string
+          improvements: string | null
+          rating: number | null
+          review_period: string
+          reviewer_id: string
+          status: string
+          strengths: string | null
+          updated_at: string | null
+        }
+        Insert: {
+          comments?: string | null
+          created_at?: string | null
+          employee_id: string
+          goals?: string | null
+          id?: string
+          improvements?: string | null
+          rating?: number | null
+          review_period: string
+          reviewer_id: string
+          status?: string
+          strengths?: string | null
+          updated_at?: string | null
+        }
+        Update: {
+          comments?: string | null
+          created_at?: string | null
+          employee_id?: string
+          goals?: string | null
+          id?: string
+          improvements?: string | null
+          rating?: number | null
+          review_period?: string
+          reviewer_id?: string
+          status?: string
+          strengths?: string | null
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       profiles: {
         Row: {
           ai_enabled: boolean | null
@@ -1114,7 +1231,7 @@ export type Database = {
       }
     }
     Enums: {
-      app_role: "admin" | "user"
+      app_role: "admin" | "user" | "hr"
     }
     CompositeTypes: {
       [_ in never]: never
@@ -1242,7 +1359,7 @@ export type CompositeTypes<
 export const Constants = {
   public: {
     Enums: {
-      app_role: ["admin", "user"],
+      app_role: ["admin", "user", "hr"],
     },
   },
 } as const
