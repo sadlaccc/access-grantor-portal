@@ -220,8 +220,8 @@ const Finance = () => {
         department: budgetCategory,
         allocated_amount: parseFloat(budgetAmount),
         spent_amount: 0,
-        start_date: budgetStart,
-        end_date: budgetEnd,
+        start_date: budgetStart ? format(budgetStart, 'yyyy-MM-dd') : null,
+        end_date: budgetEnd ? format(budgetEnd, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
