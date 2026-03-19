@@ -135,7 +135,7 @@ export default function CRM() {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       toast.success('Deal created successfully');
       setIsDealDialogOpen(false);
-      setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate('');
+      setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate(undefined);
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
   });
