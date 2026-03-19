@@ -55,6 +55,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         } else {
           setProfile(null);
           setIsAdmin(false);
+          setIsHR(false);
           setLoading(false);
         }
       }
