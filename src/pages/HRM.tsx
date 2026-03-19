@@ -20,6 +20,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 
