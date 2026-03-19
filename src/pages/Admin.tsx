@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2, Filter } from 'lucide-react';
+import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2, Filter, ScrollText } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
