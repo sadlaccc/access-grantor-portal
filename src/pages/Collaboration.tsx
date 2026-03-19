@@ -29,7 +29,7 @@ type Profile = { id: string; full_name: string | null; avatar_url: string | null
 type ChatView = 'channel' | 'dm';
 
 export default function Collaboration() {
-  const { user } = useAuth();
+  const { user, isAdmin } = useAuth();
   const isMobile = useIsMobile();
   const [channels, setChannels] = useState<Channel[]>([]);
   const [profiles, setProfiles] = useState<Profile[]>([]);
