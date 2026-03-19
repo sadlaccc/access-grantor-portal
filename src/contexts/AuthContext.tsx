@@ -113,6 +113,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const checkHRRole = async (userId: string) => {
+    const { data, error } = await supabase
+      .rpc('has_role', { _user_id: userId, _role: 'hr' });
+
+    if (error) {
+      console.error('Error checking HR role:', error);
+      setIsHR(false);
+    } else {
+      setIsHR(data);
+    }
+  };
+
   const signIn = async (email: string, password: string) => {
     const { error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
