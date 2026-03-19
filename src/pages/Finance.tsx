@@ -589,11 +589,11 @@ const Finance = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Period Start</Label>
-                        <Input type="date" value={budgetStart} onChange={e => setBudgetStart(e.target.value)} required />
+                        <DatePicker date={budgetStart} onDateChange={setBudgetStart} placeholder="Start date" />
                       </div>
                       <div className="space-y-2">
                         <Label>Period End</Label>
-                        <Input type="date" value={budgetEnd} onChange={e => setBudgetEnd(e.target.value)} required />
+                        <DatePicker date={budgetEnd} onDateChange={setBudgetEnd} placeholder="End date" />
                       </div>
                     </div>
                     <Button
