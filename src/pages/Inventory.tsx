@@ -278,6 +278,18 @@ const Inventory = () => {
     setProductReorderLevel('');
   };
 
+  const openEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductName(product.name);
+    setProductSku(product.sku);
+    setProductCategory(product.category || '');
+    setProductQuantity(product.quantity_in_stock.toString());
+    setProductPrice(product.unit_price.toString());
+    setProductReorderLevel(product.reorder_level.toString());
+    setIsEditProductOpen(true);
+  };
+
+
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
     addProductMutation.mutate({
