@@ -186,6 +186,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         session,
         profile,
         isAdmin,
+        isHR,
         loading,
         signIn,
         signUp,
