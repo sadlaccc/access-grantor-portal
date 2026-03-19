@@ -270,7 +270,7 @@ const Finance = () => {
   const resetInvoiceForm = () => {
     setInvoiceClient('');
     setInvoiceEmail('');
-    setInvoiceDueDate('');
+    setInvoiceDueDate(undefined);
     setInvoiceItems([{ description: '', quantity: 1, price: 0 }]);
   };
 
