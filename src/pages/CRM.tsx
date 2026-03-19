@@ -13,42 +13,26 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 import { Label } from '@/components/ui/label';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Building2, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2,
+  Building2, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2, Trash2,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
 
 interface Lead {
-  id: string;
-  company: string;
-  contact_name: string;
-  email: string | null;
-  phone: string | null;
-  estimated_value: number;
-  stage: string;
-  source: string | null;
-  created_at: string;
+  id: string; company: string; contact_name: string; email: string | null; phone: string | null;
+  estimated_value: number; stage: string; source: string | null; created_at: string;
 }
 
 interface Deal {
-  id: string;
-  name: string;
-  company: string;
-  value: number;
-  stage: string;
-  probability: number;
-  close_date: string | null;
-  created_at: string;
+  id: string; name: string; company: string; value: number; stage: string;
+  probability: number; close_date: string | null; created_at: string;
 }
 
 interface Activity {
-  id: string;
-  type: string;
-  description: string;
-  scheduled_at: string | null;
-  completed: boolean;
-  created_at: string;
+  id: string; type: string; description: string; scheduled_at: string | null;
+  completed: boolean; created_at: string;
 }
 
 const cardVariants = {
@@ -102,14 +86,12 @@ export default function CRM() {
   const createLeadMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('crm_leads').insert({
-        company: leadCompany,
-        contact_name: leadContact,
-        email: leadEmail || null,
-        estimated_value: parseFloat(leadValue) || 0,
-        source: leadSource || null,
-        created_by: user?.id,
+        company: leadCompany, contact_name: leadContact, email: leadEmail || null,
+        estimated_value: parseFloat(leadValue) || 0, source: leadSource || null, created_by: user?.id,
       });
       if (error) throw error;
+      await notifyAllUsers({ title: 'New Lead Added', message: `${leadCompany} - ${leadContact}`, type: 'create', app: 'crm', excludeUserId: user?.id });
+      await logAuditAction({ userId: user?.id!, action: 'create', tableName: 'crm_leads', recordSummary: `Lead: ${leadCompany}` });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
@@ -123,13 +105,12 @@ export default function CRM() {
   const createDealMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('crm_deals').insert({
-        name: dealName,
-        company: dealCompany,
-        value: parseFloat(dealValue) || 0,
-        close_date: dealCloseDate ? format(dealCloseDate, 'yyyy-MM-dd') : null,
-        created_by: user?.id,
+        name: dealName, company: dealCompany, value: parseFloat(dealValue) || 0,
+        close_date: dealCloseDate ? format(dealCloseDate, 'yyyy-MM-dd') : null, created_by: user?.id,
       });
       if (error) throw error;
+      await notifyAllUsers({ title: 'New Deal Created', message: `${dealName} - ${dealCompany}`, type: 'create', app: 'crm', excludeUserId: user?.id });
+      await logAuditAction({ userId: user?.id!, action: 'create', tableName: 'crm_deals', recordSummary: `Deal: ${dealName}` });
     },
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
@@ -138,6 +119,35 @@ export default function CRM() {
       setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate(undefined);
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
+  });
+
+  const deleteLeadMutation = useMutation({
+    mutationFn: async (lead: Lead) => {
+      const { error } = await supabase.from('crm_leads').delete().eq('id', lead.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'delete', tableName: 'crm_leads', recordId: lead.id, recordSummary: `Lead: ${lead.company}` });
+      await notifyAllUsers({ title: 'Lead Deleted', message: `${lead.company} - ${lead.contact_name}`, type: 'delete', app: 'crm', excludeUserId: user?.id });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['crm-leads'] }); toast.success('Lead deleted'); },
+  });
+
+  const deleteDealMutation = useMutation({
+    mutationFn: async (deal: Deal) => {
+      const { error } = await supabase.from('crm_deals').delete().eq('id', deal.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'delete', tableName: 'crm_deals', recordId: deal.id, recordSummary: `Deal: ${deal.name}` });
+      await notifyAllUsers({ title: 'Deal Deleted', message: `${deal.name} - ${deal.company}`, type: 'delete', app: 'crm', excludeUserId: user?.id });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['crm-deals'] }); toast.success('Deal deleted'); },
+  });
+
+  const deleteActivityMutation = useMutation({
+    mutationFn: async (activity: Activity) => {
+      const { error } = await supabase.from('crm_activities').delete().eq('id', activity.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'delete', tableName: 'crm_activities', recordId: activity.id, recordSummary: `Activity: ${activity.description}` });
+    },
+    onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['crm-activities'] }); toast.success('Activity deleted'); },
   });
 
   const getStageBadge = (stage: string) => {
@@ -171,9 +181,7 @@ export default function CRM() {
           </div>
           <div className="flex gap-2">
             <Dialog open={isDealDialogOpen} onOpenChange={setIsDealDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="outline" className="gap-2"><Handshake className="h-4 w-4" />New Deal</Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button variant="outline" className="gap-2"><Handshake className="h-4 w-4" />New Deal</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Create New Deal</DialogTitle></DialogHeader>
                 <div className="space-y-4">
@@ -190,9 +198,7 @@ export default function CRM() {
               </DialogContent>
             </Dialog>
             <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
-              <DialogTrigger asChild>
-                <Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Lead</Button>
-              </DialogTrigger>
+              <DialogTrigger asChild><Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Lead</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
                 <div className="space-y-4">
@@ -212,7 +218,6 @@ export default function CRM() {
           </div>
         </div>
 
-        {/* Stats */}
         <div className="grid gap-4 md:grid-cols-4">
           {[
             { icon: Target, label: 'Active Leads', value: leads.length, color: 'bg-primary/10 text-primary' },
@@ -221,19 +226,7 @@ export default function CRM() {
             { icon: TrendingUp, label: 'Closed Won', value: `KES ${(closedWon / 1000).toFixed(0)}K`, color: 'bg-success/10 text-success' },
           ].map((stat, idx) => (
             <motion.div key={stat.label} variants={cardVariants} initial="hidden" animate="show" transition={{ delay: idx * 0.05 }}>
-              <Card className="card-interactive">
-                <CardContent className="p-5">
-                  <div className="flex items-center gap-4">
-                    <div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}>
-                      <stat.icon className="h-6 w-6" />
-                    </div>
-                    <div>
-                      <p className="text-2xl font-bold text-foreground">{stat.value}</p>
-                      <p className="text-sm text-muted-foreground">{stat.label}</p>
-                    </div>
-                  </div>
-                </CardContent>
-              </Card>
+              <Card className="card-interactive"><CardContent className="p-5"><div className="flex items-center gap-4"><div className={`flex h-12 w-12 items-center justify-center rounded-xl ${stat.color}`}><stat.icon className="h-6 w-6" /></div><div><p className="text-2xl font-bold text-foreground">{stat.value}</p><p className="text-sm text-muted-foreground">{stat.label}</p></div></div></CardContent></Card>
             </motion.div>
           ))}
         </div>
@@ -250,44 +243,24 @@ export default function CRM() {
               <CardHeader className="pb-4 border-b border-border">
                 <div className="flex items-center justify-between">
                   <CardTitle className="text-lg font-semibold">Lead Pipeline</CardTitle>
-                  <div className="relative w-64">
-                    <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                    <Input placeholder="Search leads..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 rounded-xl" />
-                  </div>
+                  <div className="relative w-64"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input placeholder="Search leads..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="pl-9 rounded-xl" /></div>
                 </div>
               </CardHeader>
               <CardContent className="pt-4">
                 {leads.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Target className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                    No leads yet. Add your first lead above.
-                  </div>
+                  <div className="text-center py-12 text-muted-foreground"><Target className="h-10 w-10 mx-auto mb-3 opacity-50" />No leads yet. Add your first lead above.</div>
                 ) : (
                   <Table>
-                    <TableHeader><TableRow>
-                      <TableHead>Company</TableHead><TableHead>Contact</TableHead><TableHead>Value</TableHead><TableHead>Stage</TableHead><TableHead>Source</TableHead>
-                    </TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Company</TableHead><TableHead>Contact</TableHead><TableHead>Value</TableHead><TableHead>Stage</TableHead><TableHead>Source</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {leads.filter(l => l.company.toLowerCase().includes(searchTerm.toLowerCase()) || l.contact_name.toLowerCase().includes(searchTerm.toLowerCase())).map((lead) => (
                         <TableRow key={lead.id} className="hover:bg-muted/50 transition-colors">
-                          <TableCell>
-                            <div className="flex items-center gap-3">
-                              <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10">
-                                <Building2 className="h-5 w-5 text-primary" />
-                              </div>
-                              <div>
-                                <p className="font-medium">{lead.company}</p>
-                                <p className="text-sm text-muted-foreground">{lead.email}</p>
-                              </div>
-                            </div>
-                          </TableCell>
-                          <TableCell>
-                            <p className="font-medium">{lead.contact_name}</p>
-                            <p className="text-sm text-muted-foreground">{lead.phone}</p>
-                          </TableCell>
+                          <TableCell><div className="flex items-center gap-3"><div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10"><Building2 className="h-5 w-5 text-primary" /></div><div><p className="font-medium">{lead.company}</p><p className="text-sm text-muted-foreground">{lead.email}</p></div></div></TableCell>
+                          <TableCell><p className="font-medium">{lead.contact_name}</p><p className="text-sm text-muted-foreground">{lead.phone}</p></TableCell>
                           <TableCell className="font-semibold text-success">KES {lead.estimated_value.toLocaleString()}</TableCell>
                           <TableCell>{getStageBadge(lead.stage)}</TableCell>
                           <TableCell><Badge variant="outline" className="bg-muted/50">{lead.source || '—'}</Badge></TableCell>
+                          <TableCell><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteLeadMutation.mutate(lead)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -302,15 +275,10 @@ export default function CRM() {
               <CardHeader className="border-b border-border"><CardTitle className="text-lg font-semibold">Deal Pipeline</CardTitle></CardHeader>
               <CardContent className="pt-4">
                 {deals.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Handshake className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                    No deals yet. Create your first deal above.
-                  </div>
+                  <div className="text-center py-12 text-muted-foreground"><Handshake className="h-10 w-10 mx-auto mb-3 opacity-50" />No deals yet. Create your first deal above.</div>
                 ) : (
                   <Table>
-                    <TableHeader><TableRow>
-                      <TableHead>Deal Name</TableHead><TableHead>Company</TableHead><TableHead>Value</TableHead><TableHead>Stage</TableHead><TableHead>Probability</TableHead><TableHead>Close Date</TableHead>
-                    </TableRow></TableHeader>
+                    <TableHeader><TableRow><TableHead>Deal Name</TableHead><TableHead>Company</TableHead><TableHead>Value</TableHead><TableHead>Stage</TableHead><TableHead>Probability</TableHead><TableHead>Close Date</TableHead><TableHead>Actions</TableHead></TableRow></TableHeader>
                     <TableBody>
                       {deals.map((deal) => (
                         <TableRow key={deal.id} className="hover:bg-muted/50 transition-colors">
@@ -320,17 +288,12 @@ export default function CRM() {
                           <TableCell>{getStageBadge(deal.stage)}</TableCell>
                           <TableCell>
                             <div className="flex items-center gap-2">
-                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden">
-                                <motion.div 
-                                  initial={{ width: 0 }}
-                                  animate={{ width: `${deal.probability}%` }}
-                                  className="h-full bg-primary rounded-full" 
-                                />
-                              </div>
+                              <div className="w-16 h-2 bg-muted rounded-full overflow-hidden"><motion.div initial={{ width: 0 }} animate={{ width: `${deal.probability}%` }} className="h-full bg-primary rounded-full" /></div>
                               <span className="text-sm font-medium">{deal.probability}%</span>
                             </div>
                           </TableCell>
                           <TableCell className="text-sm">{deal.close_date ? new Date(deal.close_date).toLocaleDateString() : '—'}</TableCell>
+                          <TableCell><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteDealMutation.mutate(deal)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -345,20 +308,12 @@ export default function CRM() {
               <CardHeader className="border-b border-border"><CardTitle className="text-lg font-semibold">Scheduled Activities</CardTitle></CardHeader>
               <CardContent className="pt-4">
                 {activities.length === 0 ? (
-                  <div className="text-center py-12 text-muted-foreground">
-                    <Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />
-                    No activities scheduled yet.
-                  </div>
+                  <div className="text-center py-12 text-muted-foreground"><Calendar className="h-10 w-10 mx-auto mb-3 opacity-50" />No activities scheduled yet.</div>
                 ) : (
                   <div className="space-y-3">
                     {activities.map((activity, idx) => (
-                      <motion.div 
-                        key={activity.id} 
-                        initial={{ opacity: 0, x: -10 }}
-                        animate={{ opacity: 1, x: 0 }}
-                        transition={{ delay: idx * 0.05 }}
-                        className="flex items-center gap-4 rounded-xl border border-border p-4 hover:border-primary/20 transition-colors"
-                      >
+                      <motion.div key={activity.id} initial={{ opacity: 0, x: -10 }} animate={{ opacity: 1, x: 0 }} transition={{ delay: idx * 0.05 }}
+                        className="flex items-center gap-4 rounded-xl border border-border p-4 hover:border-primary/20 transition-colors group">
                         <div className={`flex h-10 w-10 items-center justify-center rounded-xl ${activity.type === 'call' ? 'bg-primary/10' : activity.type === 'email' ? 'bg-accent/10' : 'bg-warning/10'}`}>
                           {activity.type === 'call' ? <Phone className="h-5 w-5 text-primary" /> : activity.type === 'email' ? <Mail className="h-5 w-5 text-accent" /> : <Calendar className="h-5 w-5 text-warning" />}
                         </div>
@@ -366,9 +321,8 @@ export default function CRM() {
                           <p className="font-medium">{activity.description}</p>
                           {activity.scheduled_at && <p className="text-sm text-muted-foreground">{new Date(activity.scheduled_at).toLocaleString()}</p>}
                         </div>
-                        <Badge variant={activity.completed ? 'default' : 'outline'} className={activity.completed ? 'bg-success text-success-foreground' : ''}>
-                          {activity.completed ? 'Done' : 'Pending'}
-                        </Badge>
+                        <Badge variant={activity.completed ? 'default' : 'outline'}>{activity.completed ? 'Done' : 'Pending'}</Badge>
+                        <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive opacity-0 group-hover:opacity-100 transition-opacity" onClick={() => deleteActivityMutation.mutate(activity)}><Trash2 className="h-3.5 w-3.5" /></Button>
                       </motion.div>
                     ))}
                   </div>
