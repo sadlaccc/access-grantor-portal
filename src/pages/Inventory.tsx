@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2, Trash2 } from 'lucide-react';
+import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2, Trash2, Pencil } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -46,6 +46,8 @@ const Inventory = () => {
   const [searchQuery, setSearchQuery] = useState('');
   const [isProductDialogOpen, setIsProductDialogOpen] = useState(false);
   const [isOrderDialogOpen, setIsOrderDialogOpen] = useState(false);
+  const [isEditProductOpen, setIsEditProductOpen] = useState(false);
+  const [editingProduct, setEditingProduct] = useState<Product | null>(null);
 
   // Product form state
   const [productName, setProductName] = useState('');
@@ -106,7 +108,31 @@ const Inventory = () => {
     },
   });
 
-  // Delete product mutation
+  // Edit product mutation
+  const editProductMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingProduct) return;
+      const { error } = await supabase.from('inventory_products').update({
+        name: productName, sku: productSku, category: productCategory || null,
+        quantity_in_stock: parseInt(productQuantity) || 0, unit_price: parseFloat(productPrice) || 0,
+        reorder_level: parseInt(productReorderLevel) || 10,
+      }).eq('id', editingProduct.id);
+      if (error) throw error;
+      if (user) {
+        logAuditAction({ userId: user.id, action: 'update', tableName: 'inventory_products', recordId: editingProduct.id, recordSummary: productName });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      toast({ title: 'Product updated' });
+      setIsEditProductOpen(false);
+      setEditingProduct(null);
+      resetProductForm();
+    },
+    onError: (error: Error) => toast({ title: 'Failed to update product', description: error.message, variant: 'destructive' }),
+  });
+
+
   const deleteProductMutation = useMutation({
     mutationFn: async (product: Product) => {
       const { error } = await supabase.from('inventory_products').delete().eq('id', product.id);
@@ -251,6 +277,18 @@ const Inventory = () => {
     setProductPrice('');
     setProductReorderLevel('');
   };
+
+  const openEditProduct = (product: Product) => {
+    setEditingProduct(product);
+    setProductName(product.name);
+    setProductSku(product.sku);
+    setProductCategory(product.category || '');
+    setProductQuantity(product.quantity_in_stock.toString());
+    setProductPrice(product.unit_price.toString());
+    setProductReorderLevel(product.reorder_level.toString());
+    setIsEditProductOpen(true);
+  };
+
 
   const handleAddProduct = (e: React.FormEvent) => {
     e.preventDefault();
@@ -412,7 +450,27 @@ const Inventory = () => {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Edit Product Dialog */}
+        <Dialog open={isEditProductOpen} onOpenChange={(open) => { setIsEditProductOpen(open); if (!open) { setEditingProduct(null); resetProductForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Product</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Product Name</Label><Input value={productName} onChange={e => setProductName(e.target.value)} required /></div>
+                <div className="space-y-2"><Label>SKU</Label><Input value={productSku} onChange={e => setProductSku(e.target.value)} required /></div>
+              </div>
+              <div className="space-y-2"><Label>Category</Label><Input value={productCategory} onChange={e => setProductCategory(e.target.value)} /></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={productQuantity} onChange={e => setProductQuantity(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Unit Price</Label><Input type="number" step="0.01" value={productPrice} onChange={e => setProductPrice(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Reorder Level</Label><Input type="number" value={productReorderLevel} onChange={e => setProductReorderLevel(e.target.value)} /></div>
+              </div>
+              <Button onClick={() => editProductMutation.mutate()} className="w-full gradient-primary" disabled={!productName || editProductMutation.isPending}>
+                {editProductMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
@@ -507,9 +565,10 @@ const Inventory = () => {
                           )}
                         </TableCell>
                         <TableCell className="text-right">
-                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteProductMutation.mutate(product)}>
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <div className="flex items-center justify-end gap-1">
+                            <Button variant="ghost" size="icon" onClick={() => openEditProduct(product)}><Pencil className="h-4 w-4" /></Button>
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteProductMutation.mutate(product)}><Trash2 className="h-4 w-4" /></Button>
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}

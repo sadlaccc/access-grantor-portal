@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Search, BookOpen, FileText, Video, Download, Plus, Loader2, Trash2 } from 'lucide-react';
+import { Search, BookOpen, FileText, Video, Download, Plus, Loader2, Trash2, Pencil } from 'lucide-react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Input } from '@/components/ui/input';
@@ -35,6 +35,8 @@ export default function Knowledge() {
   const [searchQuery, setSearchQuery] = useState('');
   const [selectedCategory, setSelectedCategory] = useState<string | null>(null);
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingArticle, setEditingArticle] = useState<Article | null>(null);
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
   const [content, setContent] = useState('');
@@ -63,9 +65,28 @@ export default function Knowledge() {
       queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] });
       toast.success('Article created successfully');
       setIsDialogOpen(false);
-      setTitle(''); setDescription(''); setContent(''); setCategory('general'); setType('document');
+      resetForm();
     },
     onError: (error: Error) => toast.error('Failed to create article: ' + error.message),
+  });
+
+  const editArticleMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingArticle) return;
+      const { error } = await supabase.from('knowledge_articles').update({
+        title, description: description || null, content: content || null, category, type,
+      }).eq('id', editingArticle.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'update', tableName: 'knowledge_articles', recordId: editingArticle.id, recordSummary: title });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] });
+      toast.success('Article updated');
+      setIsEditDialogOpen(false);
+      setEditingArticle(null);
+      resetForm();
+    },
+    onError: (error: Error) => toast.error('Failed to update article: ' + error.message),
   });
 
   const deleteArticleMutation = useMutation({
@@ -77,6 +98,18 @@ export default function Knowledge() {
     },
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['knowledge-articles'] }); toast.success('Article deleted'); },
   });
+
+  const resetForm = () => { setTitle(''); setDescription(''); setContent(''); setCategory('general'); setType('document'); };
+
+  const openEditDialog = (article: Article) => {
+    setEditingArticle(article);
+    setTitle(article.title);
+    setDescription(article.description || '');
+    setContent(article.content || '');
+    setCategory(article.category);
+    setType(article.type);
+    setIsEditDialogOpen(true);
+  };
 
   const categoryCounts = articles.reduce((acc, a) => { acc[a.category] = (acc[a.category] || 0) + 1; return acc; }, {} as Record<string, number>);
 
@@ -90,6 +123,30 @@ export default function Knowledge() {
     return (<MainLayout><div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></MainLayout>);
   }
 
+  const articleFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2"><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Article title" /></div>
+      <div className="space-y-2"><Label>Description</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" /></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2"><Label>Category</Label>
+          <Select value={category} onValueChange={setCategory}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}</SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2"><Label>Type</Label>
+          <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="document">Document</SelectItem><SelectItem value="video">Video</SelectItem><SelectItem value="download">Download</SelectItem></SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-2"><Label>Content</Label><Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Article content..." rows={6} /></div>
+      <Button className="w-full" onClick={() => isEdit ? editArticleMutation.mutate() : createArticleMutation.mutate()} disabled={!title || (isEdit ? editArticleMutation.isPending : createArticleMutation.isPending)}>
+        {(isEdit ? editArticleMutation.isPending : createArticleMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isEdit ? 'Save Changes' : 'Create Article'}
+      </Button>
+    </div>
+  );
+
   return (
     <MainLayout>
       <div className="p-8">
@@ -99,29 +156,18 @@ export default function Knowledge() {
             <DialogTrigger asChild><Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Article</Button></DialogTrigger>
             <DialogContent className="max-w-2xl">
               <DialogHeader><DialogTitle>Create New Article</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2"><Label>Title *</Label><Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Article title" /></div>
-                <div className="space-y-2"><Label>Description</Label><Input value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Brief description" /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Category</Label>
-                    <Select value={category} onValueChange={setCategory}><SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>{categories.map((c) => (<SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>))}</SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2"><Label>Type</Label>
-                    <Select value={type} onValueChange={setType}><SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="document">Document</SelectItem><SelectItem value="video">Video</SelectItem><SelectItem value="download">Download</SelectItem></SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2"><Label>Content</Label><Textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Article content..." rows={6} /></div>
-                <Button className="w-full" onClick={() => createArticleMutation.mutate()} disabled={!title || createArticleMutation.isPending}>
-                  {createArticleMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Article
-                </Button>
-              </div>
+              {articleFormContent(false)}
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setEditingArticle(null); resetForm(); } }}>
+          <DialogContent className="max-w-2xl">
+            <DialogHeader><DialogTitle>Edit Article</DialogTitle></DialogHeader>
+            {articleFormContent(true)}
+          </DialogContent>
+        </Dialog>
 
         <div className="mb-6 relative max-w-lg">
           <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
@@ -152,8 +198,10 @@ export default function Knowledge() {
                   const Icon = typeIcons[article.type] || FileText;
                   return (
                     <div key={article.id} className="group cursor-pointer rounded-xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg animate-slide-up relative" style={{ animationDelay: `${index * 30}ms` }}>
-                      <Button size="icon" variant="ghost" className="absolute top-3 right-3 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                        onClick={(e) => { e.stopPropagation(); deleteArticleMutation.mutate(article); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                        <Button size="icon" variant="ghost" className="h-7 w-7" onClick={(e) => { e.stopPropagation(); openEditDialog(article); }}><Pencil className="h-3.5 w-3.5" /></Button>
+                        <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={(e) => { e.stopPropagation(); deleteArticleMutation.mutate(article); }}><Trash2 className="h-3.5 w-3.5" /></Button>
+                      </div>
                       <div className="flex items-start gap-4">
                         <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10"><Icon className="h-5 w-5 text-primary" /></div>
                         <div className="flex-1">
