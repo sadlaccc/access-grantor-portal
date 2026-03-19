@@ -81,15 +81,15 @@ const Finance = () => {
   const [expenseCategory, setExpenseCategory] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseVendor, setExpenseVendor] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState<Date | undefined>(new Date());
   const [expenseReceipt, setExpenseReceipt] = useState('');
 
   // Budget form state
   const [budgetName, setBudgetName] = useState('');
   const [budgetCategory, setBudgetCategory] = useState('');
   const [budgetAmount, setBudgetAmount] = useState('');
-  const [budgetStart, setBudgetStart] = useState('');
-  const [budgetEnd, setBudgetEnd] = useState('');
+  const [budgetStart, setBudgetStart] = useState<Date | undefined>();
+  const [budgetEnd, setBudgetEnd] = useState<Date | undefined>();
 
   // Fetch invoices
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
