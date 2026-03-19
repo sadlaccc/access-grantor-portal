@@ -287,8 +287,8 @@ const Finance = () => {
     setBudgetName('');
     setBudgetCategory('');
     setBudgetAmount('');
-    setBudgetStart('');
-    setBudgetEnd('');
+    setBudgetStart(undefined);
+    setBudgetEnd(undefined);
   };
 
   const addInvoiceItem = () => {
