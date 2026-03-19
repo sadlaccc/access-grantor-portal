@@ -194,7 +194,7 @@ const Finance = () => {
         description: expenseDescription,
         category: expenseCategory,
         amount: parseFloat(expenseAmount),
-        expense_date: expenseDate,
+        expense_date: expenseDate ? format(expenseDate, 'yyyy-MM-dd') : null,
         vendor: expenseVendor || null,
         receipt_url: expenseReceipt || null,
         status: 'pending',
