@@ -45,6 +45,8 @@ export default function Collaboration() {
   const [channelType, setChannelType] = useState('public');
   const [sidebarSection, setSidebarSection] = useState<'channels' | 'dms'>('channels');
   const [showMobileChat, setShowMobileChat] = useState(false);
+  const [editingChannelId, setEditingChannelId] = useState<string | null>(null);
+  const [editChannelName, setEditChannelName] = useState('');
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
   const scrollToBottom = useCallback(() => {
