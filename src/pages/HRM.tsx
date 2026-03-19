@@ -240,6 +240,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-announcements'] });
       toast.success('Announcement sent to all employees');
+      notifyAllUsers({ title: 'New Announcement', message: annTitle, type: 'info', app: 'hrm', excludeUserId: user?.id });
       setIsAnnouncementOpen(false);
       setAnnTitle(''); setAnnContent(''); setAnnCategory('general');
     },
