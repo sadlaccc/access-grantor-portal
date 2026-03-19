@@ -1,4 +1,4 @@
-import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package, Loader2, UserCircle } from 'lucide-react';
+import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package, Loader2, UserCircle, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -13,6 +13,7 @@ import { cn } from '@/lib/utils';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
 
 interface Asset {
   id: string;
@@ -24,6 +25,7 @@ interface Asset {
   purchase_date: string | null;
   notes: string | null;
   created_at: string;
+  created_by?: string | null;
 }
 
 const statusColors: Record<string, string> = {
@@ -113,9 +115,32 @@ export default function Assets() {
       setType('laptop');
       setStatus('available');
       setAssignedTo(null);
+      if (user) {
+        notifyAllUsers({ title: 'New Asset Added', message: `Asset "${name}" was added to IT inventory`, type: 'info', app: 'assets', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'create', tableName: 'it_assets', recordSummary: name });
+      }
     },
     onError: (error: Error) => {
       toast.error('Failed to add asset: ' + error.message);
+    },
+  });
+
+  const deleteAssetMutation = useMutation({
+    mutationFn: async (asset: Asset) => {
+      const { error } = await supabase.from('it_assets').delete().eq('id', asset.id);
+      if (error) throw error;
+      return asset;
+    },
+    onSuccess: (asset) => {
+      queryClient.invalidateQueries({ queryKey: ['it-assets'] });
+      toast.success('Asset deleted');
+      if (user) {
+        notifyAllUsers({ title: 'Asset Deleted', message: `Asset "${asset.name}" was removed`, type: 'warning', app: 'assets', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'delete', tableName: 'it_assets', recordId: asset.id, recordSummary: asset.name });
+      }
+    },
+    onError: (error: Error) => {
+      toast.error('Failed to delete asset: ' + error.message);
     },
   });
 
@@ -269,9 +294,19 @@ export default function Assets() {
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/15">
                       <Icon className="h-6 w-6 text-primary" />
                     </div>
-                    <Badge variant="outline" className={cn('capitalize text-xs', statusColors[asset.status])}>
-                      {asset.status}
-                    </Badge>
+                    <div className="flex items-center gap-2">
+                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[asset.status])}>
+                        {asset.status}
+                      </Badge>
+                      <Button
+                        variant="ghost"
+                        size="icon"
+                        className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                        onClick={() => deleteAssetMutation.mutate(asset)}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </Button>
+                    </div>
                   </div>
                   <h3 className="mt-4 font-semibold text-card-foreground leading-tight">{asset.name}</h3>
                   <p className="mt-1 text-xs font-mono text-muted-foreground">{asset.serial_number}</p>
