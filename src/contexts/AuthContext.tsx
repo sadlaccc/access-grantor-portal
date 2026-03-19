@@ -70,6 +70,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         Promise.all([
           fetchProfile(session.user.id),
           checkAdminRole(session.user.id),
+          checkHRRole(session.user.id),
         ]).finally(() => {
           if (mounted) setLoading(false);
         });
