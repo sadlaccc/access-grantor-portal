@@ -255,18 +255,29 @@ export default function Collaboration() {
                 </Dialog>
               </div>
               {filteredChannels.map((ch) => (
+                editingChannelId === ch.id ? (
+                  <div key={ch.id} className="flex items-center gap-1 px-2 py-1">
+                    <Input value={editChannelName} onChange={(e) => setEditChannelName(e.target.value)} className="h-7 text-sm flex-1" autoFocus onKeyDown={(e) => e.key === 'Enter' && handleRenameChannel(ch.id)} />
+                    <button onClick={() => handleRenameChannel(ch.id)} className="h-6 w-6 rounded flex items-center justify-center hover:bg-primary/10"><Check className="h-3.5 w-3.5 text-primary" /></button>
+                    <button onClick={() => setEditingChannelId(null)} className="h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10"><X className="h-3.5 w-3.5 text-destructive" /></button>
+                  </div>
+                ) : (
                 <button key={ch.id} onClick={() => selectChannel(ch)} className={`w-full group flex items-center gap-2 rounded-lg px-2 py-1.5 text-sm transition-colors ${chatView === 'channel' && selectedChannel?.id === ch.id ? 'bg-primary/10 text-primary font-medium' : 'text-muted-foreground hover:bg-muted/50 hover:text-foreground'}`}>
                   {ch.type === 'private' ? <Lock className="h-3.5 w-3.5 shrink-0" /> : <Hash className="h-3.5 w-3.5 shrink-0" />}
                   <span className="truncate">{ch.name}</span>
-                  <DropdownMenu>
-                    <DropdownMenuTrigger asChild>
-                      <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-3.5 w-3.5" /></span>
-                    </DropdownMenuTrigger>
-                    <DropdownMenuContent align="end">
-                      <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteChannel(ch.id)}><Trash2 className="h-3.5 w-3.5 mr-2" />Delete Channel</DropdownMenuItem>
-                    </DropdownMenuContent>
-                  </DropdownMenu>
+                  {isAdmin && (
+                    <DropdownMenu>
+                      <DropdownMenuTrigger asChild>
+                        <span className="ml-auto opacity-0 group-hover:opacity-100 transition-opacity shrink-0" onClick={(e) => e.stopPropagation()}><MoreVertical className="h-3.5 w-3.5" /></span>
+                      </DropdownMenuTrigger>
+                      <DropdownMenuContent align="end">
+                        <DropdownMenuItem onClick={(e) => { e.stopPropagation(); setEditingChannelId(ch.id); setEditChannelName(ch.name); }}><Pencil className="h-3.5 w-3.5 mr-2" />Rename</DropdownMenuItem>
+                        <DropdownMenuItem className="text-destructive" onClick={() => handleDeleteChannel(ch.id)}><Trash2 className="h-3.5 w-3.5 mr-2" />Delete Channel</DropdownMenuItem>
+                      </DropdownMenuContent>
+                    </DropdownMenu>
+                  )}
                 </button>
+                )
               ))}
             </motion.div>
           ) : (
