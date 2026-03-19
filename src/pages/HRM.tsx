@@ -75,14 +75,14 @@ export default function HRM() {
 
   // Leave form
   const [leaveType, setLeaveType] = useState('annual');
-  const [leaveStart, setLeaveStart] = useState('');
-  const [leaveEnd, setLeaveEnd] = useState('');
+  const [leaveStart, setLeaveStart] = useState<Date | undefined>();
+  const [leaveEnd, setLeaveEnd] = useState<Date | undefined>();
   const [leaveReason, setLeaveReason] = useState('');
 
   // Training form
   const [trainingName, setTrainingName] = useState('');
   const [trainingDesc, setTrainingDesc] = useState('');
-  const [trainingDueDate, setTrainingDueDate] = useState('');
+  const [trainingDueDate, setTrainingDueDate] = useState<Date | undefined>();
 
   // Add employee form
   const [empEmail, setEmpEmail] = useState('');
