@@ -20,6 +20,7 @@ import {
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
+import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
 import { motion } from 'framer-motion';
 import { format } from 'date-fns';
 
@@ -158,6 +159,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request submitted');
+      notifyAllUsers({ title: 'New Leave Request', message: `${leaveType} leave requested`, type: 'create', app: 'hrm', excludeUserId: user?.id });
       setIsLeaveDialogOpen(false);
       setLeaveType('annual'); setLeaveStart(undefined); setLeaveEnd(undefined); setLeaveReason('');
     },
@@ -172,6 +174,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request updated');
+      notifyAllUsers({ title: 'Leave Request Updated', message: 'A leave request status was changed', type: 'update', app: 'hrm', excludeUserId: user?.id });
     },
   });
 
@@ -185,6 +188,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['trainings'] });
       toast.success('Training created');
+      notifyAllUsers({ title: 'New Training Program', message: trainingName, type: 'create', app: 'hrm', excludeUserId: user?.id });
       setIsTrainingDialogOpen(false);
       setTrainingName(''); setTrainingDesc(''); setTrainingDueDate(undefined);
     },
@@ -236,6 +240,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['hrm-announcements'] });
       toast.success('Announcement sent to all employees');
+      notifyAllUsers({ title: 'New Announcement', message: annTitle, type: 'info', app: 'hrm', excludeUserId: user?.id });
       setIsAnnouncementOpen(false);
       setAnnTitle(''); setAnnContent(''); setAnnCategory('general');
     },

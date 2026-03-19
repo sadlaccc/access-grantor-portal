@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2, Filter } from 'lucide-react';
+import { Search, UserPlus, Edit2, Loader2, Shield, KeyRound, Settings2, Filter, ScrollText } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,10 @@ import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { supabase } from '@/integrations/supabase/client';
 import { toast } from 'sonner';
 import { z } from 'zod';
+import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { formatDistanceToNow } from 'date-fns';
 
 const createUserSchema = z.object({
   email: z.string().email('Invalid email address').max(255),
@@ -71,6 +75,17 @@ interface App {
 interface UserAppAssignment {
   app_id: string;
   user_id: string;
+}
+
+interface AuditLogEntry {
+  id: string;
+  user_id: string | null;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  record_summary: string | null;
+  details: any;
+  created_at: string;
 }
 
 export default function Admin() {

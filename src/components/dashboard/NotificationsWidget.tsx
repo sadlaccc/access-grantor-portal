@@ -1,5 +1,5 @@
-import { useEffect, useState } from 'react';
-import { Bell, Ticket, CheckCircle, AlertCircle, Clock, X } from 'lucide-react';
+import { useEffect } from 'react';
+import { Bell, CheckCircle, AlertCircle, Clock, X, Trash2, FileText, Users, Package, FolderKanban, BookOpen, Laptop } from 'lucide-react';
 import { motion } from 'framer-motion';
 import { supabase } from '@/integrations/supabase/client';
 import { Badge } from '@/components/ui/badge';
@@ -7,119 +7,45 @@ import { Button } from '@/components/ui/button';
 import { ScrollArea } from '@/components/ui/scroll-area';
 import { cn } from '@/lib/utils';
 import { formatDistanceToNow } from 'date-fns';
-import { usePushNotifications } from '@/hooks/usePushNotifications';
+import { useNotifications } from '@/hooks/useNotifications';
+import { useAuth } from '@/contexts/AuthContext';
 
-interface Notification {
-  id: string;
-  type: 'ticket_created' | 'ticket_updated' | 'ticket_resolved';
-  title: string;
-  message: string;
-  timestamp: Date;
-  read: boolean;
-  ticketId?: string;
-}
-
-const notificationIcons = {
-  ticket_created: Ticket,
-  ticket_updated: Clock,
-  ticket_resolved: CheckCircle,
+const typeIcons: Record<string, React.ElementType> = {
+  create: CheckCircle,
+  update: Clock,
+  delete: Trash2,
+  info: Bell,
+  finance: FileText,
+  hrm: Users,
+  inventory: Package,
+  project: FolderKanban,
+  knowledge: BookOpen,
+  asset: Laptop,
 };
 
-const notificationColors = {
-  ticket_created: 'text-primary bg-primary/10',
-  ticket_updated: 'text-warning bg-warning/10',
-  ticket_resolved: 'text-success bg-success/10',
+const typeColors: Record<string, string> = {
+  create: 'text-success bg-success/10',
+  update: 'text-warning bg-warning/10',
+  delete: 'text-destructive bg-destructive/10',
+  info: 'text-primary bg-primary/10',
 };
 
 export function NotificationsWidget() {
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
-  const { sendNotification, permission } = usePushNotifications();
+  const { user } = useAuth();
+  const { notifications, unreadCount, markAsRead, markAllAsRead, deleteNotification } = useNotifications();
 
+  // Subscribe to realtime notifications
   useEffect(() => {
-    const fetchRecentTickets = async () => {
-      const { data: tickets } = await supabase
-        .from('tickets')
-        .select('id, ticket_number, title, status, created_at, updated_at')
-        .order('created_at', { ascending: false })
-        .limit(10);
-
-      if (tickets) {
-        const initialNotifications: Notification[] = tickets.map((ticket) => ({
-          id: `ticket-${ticket.id}`,
-          type: ticket.status === 'resolved' ? 'ticket_resolved' : 'ticket_created',
-          title: `Ticket #${ticket.ticket_number}`,
-          message: ticket.title,
-          timestamp: new Date(ticket.created_at),
-          read: false,
-          ticketId: ticket.id,
-        }));
-        setNotifications(initialNotifications);
-        setUnreadCount(initialNotifications.length);
-      }
-    };
-
-    fetchRecentTickets();
-
+    if (!user) return;
     const channel = supabase
-      .channel('tickets-realtime')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'tickets' }, (payload) => {
-        const ticket = payload.new as any;
-        const n: Notification = {
-          id: `ticket-new-${ticket.id}-${Date.now()}`,
-          type: 'ticket_created',
-          title: `New Ticket #${ticket.ticket_number}`,
-          message: ticket.title,
-          timestamp: new Date(),
-          read: false,
-          ticketId: ticket.id,
-        };
-        setNotifications((prev) => [n, ...prev.slice(0, 19)]);
-        setUnreadCount((prev) => prev + 1);
-        if (permission === 'granted') {
-          sendNotification(`New Ticket #${ticket.ticket_number}`, { body: ticket.title, tag: `ticket-${ticket.id}` });
-        }
-      })
-      .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'tickets' }, (payload) => {
-        const ticket = payload.new as any;
-        const old = payload.old as any;
-        if (ticket.status !== old.status) {
-          const n: Notification = {
-            id: `ticket-update-${ticket.id}-${Date.now()}`,
-            type: ticket.status === 'resolved' ? 'ticket_resolved' : 'ticket_updated',
-            title: `Ticket #${ticket.ticket_number} Updated`,
-            message: `Status changed to ${ticket.status}`,
-            timestamp: new Date(),
-            read: false,
-            ticketId: ticket.id,
-          };
-          setNotifications((prev) => [n, ...prev.slice(0, 19)]);
-          setUnreadCount((prev) => prev + 1);
-          if (permission === 'granted') {
-            sendNotification(`Ticket #${ticket.ticket_number} Updated`, { body: `Status: ${ticket.status}`, tag: `ticket-update-${ticket.id}` });
-          }
-        }
+      .channel('notifications-realtime')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'notifications', filter: `user_id=eq.${user.id}` }, () => {
+        // The useNotifications hook will auto-refetch via react-query
       })
       .subscribe();
 
     return () => { supabase.removeChannel(channel); };
-  }, []);
-
-  const markAsRead = (id: string) => {
-    setNotifications((prev) => prev.map((n) => (n.id === id ? { ...n, read: true } : n)));
-    setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
-
-  const markAllAsRead = () => {
-    setNotifications((prev) => prev.map((n) => ({ ...n, read: true })));
-    setUnreadCount(0);
-  };
-
-  const dismiss = (id: string) => {
-    const n = notifications.find((n) => n.id === id);
-    setNotifications((prev) => prev.filter((n) => n.id !== id));
-    if (n && !n.read) setUnreadCount((prev) => Math.max(0, prev - 1));
-  };
+  }, [user]);
 
   return (
     <motion.div
@@ -139,7 +65,7 @@ export function NotificationsWidget() {
           )}
         </div>
         {unreadCount > 0 && (
-          <Button variant="ghost" size="sm" onClick={markAllAsRead} className="text-xs text-muted-foreground hover:text-foreground h-7">
+          <Button variant="ghost" size="sm" onClick={() => markAllAsRead()} className="text-xs text-muted-foreground hover:text-foreground h-7">
             Mark all read
           </Button>
         )}
@@ -156,7 +82,8 @@ export function NotificationsWidget() {
         ) : (
           <div className="divide-y divide-border">
             {notifications.map((notification) => {
-              const Icon = notificationIcons[notification.type];
+              const Icon = typeIcons[notification.type] || typeIcons[notification.app || 'info'] || Bell;
+              const colorClass = typeColors[notification.type] || typeColors.info;
               return (
                 <div
                   key={notification.id}
@@ -164,9 +91,9 @@ export function NotificationsWidget() {
                     'group relative flex items-start gap-3 px-6 py-4 transition-colors hover:bg-muted/30 cursor-pointer',
                     !notification.read && 'bg-primary/[0.03]'
                   )}
-                  onClick={() => markAsRead(notification.id)}
+                  onClick={() => !notification.read && markAsRead(notification.id)}
                 >
-                  <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', notificationColors[notification.type])}>
+                  <div className={cn('mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-xl', colorClass)}>
                     <Icon className="h-3.5 w-3.5" />
                   </div>
                   <div className="min-w-0 flex-1">
@@ -176,14 +103,14 @@ export function NotificationsWidget() {
                     </div>
                     <p className="mt-0.5 text-xs text-muted-foreground line-clamp-1">{notification.message}</p>
                     <p className="mt-1 text-[10px] text-muted-foreground/60">
-                      {formatDistanceToNow(notification.timestamp, { addSuffix: true })}
+                      {formatDistanceToNow(new Date(notification.created_at), { addSuffix: true })}
                     </p>
                   </div>
                   <Button
                     variant="ghost"
                     size="icon"
                     className="h-6 w-6 shrink-0 opacity-0 group-hover:opacity-100 transition-opacity"
-                    onClick={(e) => { e.stopPropagation(); dismiss(notification.id); }}
+                    onClick={(e) => { e.stopPropagation(); deleteNotification(notification.id); }}
                   >
                     <X className="h-3 w-3" />
                   </Button>
