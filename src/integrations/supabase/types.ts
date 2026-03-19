@@ -389,6 +389,36 @@ export type Database = {
         }
         Relationships: []
       }
+      hrm_announcements: {
+        Row: {
+          category: string
+          content: string
+          created_at: string | null
+          created_by: string
+          id: string
+          title: string
+          updated_at: string | null
+        }
+        Insert: {
+          category?: string
+          content: string
+          created_at?: string | null
+          created_by: string
+          id?: string
+          title: string
+          updated_at?: string | null
+        }
+        Update: {
+          category?: string
+          content?: string
+          created_at?: string | null
+          created_by?: string
+          id?: string
+          title?: string
+          updated_at?: string | null
+        }
+        Relationships: []
+      }
       inventory_order_items: {
         Row: {
           id: string
