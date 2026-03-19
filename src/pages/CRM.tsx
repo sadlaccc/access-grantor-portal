@@ -11,9 +11,10 @@ import { Badge } from '@/components/ui/badge';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
-  Building2, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2, Trash2,
+  Building2, DollarSign, TrendingUp, Search, Plus, Phone, Mail, Calendar, Target, Handshake, Loader2, Trash2, Pencil,
 } from 'lucide-react';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
@@ -46,15 +47,23 @@ export default function CRM() {
   const [searchTerm, setSearchTerm] = useState('');
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
   const [isDealDialogOpen, setIsDealDialogOpen] = useState(false);
+  const [isEditLeadOpen, setIsEditLeadOpen] = useState(false);
+  const [isEditDealOpen, setIsEditDealOpen] = useState(false);
+  const [editingLead, setEditingLead] = useState<Lead | null>(null);
+  const [editingDeal, setEditingDeal] = useState<Deal | null>(null);
+
   const [leadCompany, setLeadCompany] = useState('');
   const [leadContact, setLeadContact] = useState('');
   const [leadEmail, setLeadEmail] = useState('');
   const [leadValue, setLeadValue] = useState('');
   const [leadSource, setLeadSource] = useState('');
+  const [leadStage, setLeadStage] = useState('discovery');
   const [dealName, setDealName] = useState('');
   const [dealCompany, setDealCompany] = useState('');
   const [dealValue, setDealValue] = useState('');
   const [dealCloseDate, setDealCloseDate] = useState<Date | undefined>();
+  const [dealStage, setDealStage] = useState('discovery');
+  const [dealProbability, setDealProbability] = useState('0');
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ['crm-leads'],
@@ -97,7 +106,27 @@ export default function CRM() {
       queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
       toast.success('Lead added successfully');
       setIsLeadDialogOpen(false);
-      setLeadCompany(''); setLeadContact(''); setLeadEmail(''); setLeadValue(''); setLeadSource('');
+      resetLeadForm();
+    },
+    onError: (error: Error) => toast.error('Failed: ' + error.message),
+  });
+
+  const editLeadMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingLead) return;
+      const { error } = await supabase.from('crm_leads').update({
+        company: leadCompany, contact_name: leadContact, email: leadEmail || null,
+        estimated_value: parseFloat(leadValue) || 0, source: leadSource || null, stage: leadStage,
+      }).eq('id', editingLead.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'update', tableName: 'crm_leads', recordId: editingLead.id, recordSummary: `Lead: ${leadCompany}` });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+      toast.success('Lead updated');
+      setIsEditLeadOpen(false);
+      setEditingLead(null);
+      resetLeadForm();
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
   });
@@ -116,7 +145,28 @@ export default function CRM() {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       toast.success('Deal created successfully');
       setIsDealDialogOpen(false);
-      setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate(undefined);
+      resetDealForm();
+    },
+    onError: (error: Error) => toast.error('Failed: ' + error.message),
+  });
+
+  const editDealMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingDeal) return;
+      const { error } = await supabase.from('crm_deals').update({
+        name: dealName, company: dealCompany, value: parseFloat(dealValue) || 0,
+        close_date: dealCloseDate ? format(dealCloseDate, 'yyyy-MM-dd') : null,
+        stage: dealStage, probability: parseInt(dealProbability) || 0,
+      }).eq('id', editingDeal.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'update', tableName: 'crm_deals', recordId: editingDeal.id, recordSummary: `Deal: ${dealName}` });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      toast.success('Deal updated');
+      setIsEditDealOpen(false);
+      setEditingDeal(null);
+      resetDealForm();
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
   });
@@ -150,6 +200,31 @@ export default function CRM() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['crm-activities'] }); toast.success('Activity deleted'); },
   });
 
+  const resetLeadForm = () => { setLeadCompany(''); setLeadContact(''); setLeadEmail(''); setLeadValue(''); setLeadSource(''); setLeadStage('discovery'); };
+  const resetDealForm = () => { setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate(undefined); setDealStage('discovery'); setDealProbability('0'); };
+
+  const openEditLead = (lead: Lead) => {
+    setEditingLead(lead);
+    setLeadCompany(lead.company);
+    setLeadContact(lead.contact_name);
+    setLeadEmail(lead.email || '');
+    setLeadValue(lead.estimated_value.toString());
+    setLeadSource(lead.source || '');
+    setLeadStage(lead.stage);
+    setIsEditLeadOpen(true);
+  };
+
+  const openEditDeal = (deal: Deal) => {
+    setEditingDeal(deal);
+    setDealName(deal.name);
+    setDealCompany(deal.company);
+    setDealValue(deal.value.toString());
+    setDealCloseDate(deal.close_date ? new Date(deal.close_date) : undefined);
+    setDealStage(deal.stage);
+    setDealProbability(deal.probability.toString());
+    setIsEditDealOpen(true);
+  };
+
   const getStageBadge = (stage: string) => {
     const stages: Record<string, { label: string; className: string }> = {
       discovery: { label: 'Discovery', className: 'bg-muted text-muted-foreground' },
@@ -163,6 +238,15 @@ export default function CRM() {
     return <Badge className={s.className}>{s.label}</Badge>;
   };
 
+  const stageOptions = [
+    { value: 'discovery', label: 'Discovery' },
+    { value: 'qualification', label: 'Qualification' },
+    { value: 'proposal', label: 'Proposal' },
+    { value: 'negotiation', label: 'Negotiation' },
+    { value: 'closed-won', label: 'Closed Won' },
+    { value: 'closed-lost', label: 'Closed Lost' },
+  ];
+
   const totalPipeline = deals.reduce((sum, d) => sum + d.value, 0);
   const closedWon = deals.filter(d => d.stage === 'closed-won').reduce((sum, d) => sum + d.value, 0);
   const isLoading = leadsLoading || dealsLoading;
@@ -170,6 +254,54 @@ export default function CRM() {
   if (isLoading) {
     return <MainLayout><div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></MainLayout>;
   }
+
+  const leadFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2"><Label>Company Name *</Label><Input value={leadCompany} onChange={(e) => setLeadCompany(e.target.value)} placeholder="Company name" /></div>
+      <div className="space-y-2"><Label>Contact Person *</Label><Input value={leadContact} onChange={(e) => setLeadContact(e.target.value)} placeholder="Contact name" /></div>
+      <div className="space-y-2"><Label>Email</Label><Input type="email" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} placeholder="contact@company.com" /></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2"><Label>Estimated Value (KES)</Label><Input type="number" value={leadValue} onChange={(e) => setLeadValue(e.target.value)} placeholder="50000" /></div>
+        <div className="space-y-2"><Label>Source</Label><Input value={leadSource} onChange={(e) => setLeadSource(e.target.value)} placeholder="Website, Referral..." /></div>
+      </div>
+      {isEdit && (
+        <div className="space-y-2"><Label>Stage</Label>
+          <Select value={leadStage} onValueChange={setLeadStage}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>{stageOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+          </Select>
+        </div>
+      )}
+      <Button className="w-full" onClick={() => isEdit ? editLeadMutation.mutate() : createLeadMutation.mutate()} disabled={!leadCompany || !leadContact || (isEdit ? editLeadMutation.isPending : createLeadMutation.isPending)}>
+        {(isEdit ? editLeadMutation.isPending : createLeadMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isEdit ? 'Save Changes' : 'Add Lead'}
+      </Button>
+    </div>
+  );
+
+  const dealFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2"><Label>Deal Name *</Label><Input value={dealName} onChange={(e) => setDealName(e.target.value)} placeholder="Enterprise License Deal" /></div>
+      <div className="space-y-2"><Label>Company *</Label><Input value={dealCompany} onChange={(e) => setDealCompany(e.target.value)} placeholder="Acme Corp" /></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2"><Label>Value (KES)</Label><Input type="number" value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder="50000" /></div>
+        <div className="space-y-2"><Label>Close Date</Label><DatePicker date={dealCloseDate} onDateChange={setDealCloseDate} placeholder="Select close date" /></div>
+      </div>
+      {isEdit && (
+        <div className="grid grid-cols-2 gap-4">
+          <div className="space-y-2"><Label>Stage</Label>
+            <Select value={dealStage} onValueChange={setDealStage}><SelectTrigger><SelectValue /></SelectTrigger>
+              <SelectContent>{stageOptions.map(s => <SelectItem key={s.value} value={s.value}>{s.label}</SelectItem>)}</SelectContent>
+            </Select>
+          </div>
+          <div className="space-y-2"><Label>Probability (%)</Label><Input type="number" min="0" max="100" value={dealProbability} onChange={(e) => setDealProbability(e.target.value)} /></div>
+        </div>
+      )}
+      <Button className="w-full" onClick={() => isEdit ? editDealMutation.mutate() : createDealMutation.mutate()} disabled={!dealName || !dealCompany || (isEdit ? editDealMutation.isPending : createDealMutation.isPending)}>
+        {(isEdit ? editDealMutation.isPending : createDealMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isEdit ? 'Save Changes' : 'Create Deal'}
+      </Button>
+    </div>
+  );
 
   return (
     <MainLayout>
@@ -184,39 +316,34 @@ export default function CRM() {
               <DialogTrigger asChild><Button variant="outline" className="gap-2"><Handshake className="h-4 w-4" />New Deal</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Create New Deal</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2"><Label>Deal Name *</Label><Input value={dealName} onChange={(e) => setDealName(e.target.value)} placeholder="Enterprise License Deal" /></div>
-                  <div className="space-y-2"><Label>Company *</Label><Input value={dealCompany} onChange={(e) => setDealCompany(e.target.value)} placeholder="Acme Corp" /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Value (KES)</Label><Input type="number" value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder="50000" /></div>
-                    <div className="space-y-2"><Label>Close Date</Label><DatePicker date={dealCloseDate} onDateChange={setDealCloseDate} placeholder="Select close date" /></div>
-                  </div>
-                  <Button className="w-full" onClick={() => createDealMutation.mutate()} disabled={!dealName || !dealCompany || createDealMutation.isPending}>
-                    {createDealMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Deal
-                  </Button>
-                </div>
+                {dealFormContent(false)}
               </DialogContent>
             </Dialog>
             <Dialog open={isLeadDialogOpen} onOpenChange={setIsLeadDialogOpen}>
               <DialogTrigger asChild><Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Lead</Button></DialogTrigger>
               <DialogContent>
                 <DialogHeader><DialogTitle>Add New Lead</DialogTitle></DialogHeader>
-                <div className="space-y-4">
-                  <div className="space-y-2"><Label>Company Name *</Label><Input value={leadCompany} onChange={(e) => setLeadCompany(e.target.value)} placeholder="Company name" /></div>
-                  <div className="space-y-2"><Label>Contact Person *</Label><Input value={leadContact} onChange={(e) => setLeadContact(e.target.value)} placeholder="Contact name" /></div>
-                  <div className="space-y-2"><Label>Email</Label><Input type="email" value={leadEmail} onChange={(e) => setLeadEmail(e.target.value)} placeholder="contact@company.com" /></div>
-                  <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Estimated Value (KES)</Label><Input type="number" value={leadValue} onChange={(e) => setLeadValue(e.target.value)} placeholder="50000" /></div>
-                    <div className="space-y-2"><Label>Source</Label><Input value={leadSource} onChange={(e) => setLeadSource(e.target.value)} placeholder="Website, Referral..." /></div>
-                  </div>
-                  <Button className="w-full" onClick={() => createLeadMutation.mutate()} disabled={!leadCompany || !leadContact || createLeadMutation.isPending}>
-                    {createLeadMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Add Lead
-                  </Button>
-                </div>
+                {leadFormContent(false)}
               </DialogContent>
             </Dialog>
           </div>
         </div>
+
+        {/* Edit Lead Dialog */}
+        <Dialog open={isEditLeadOpen} onOpenChange={(open) => { setIsEditLeadOpen(open); if (!open) { setEditingLead(null); resetLeadForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Lead</DialogTitle></DialogHeader>
+            {leadFormContent(true)}
+          </DialogContent>
+        </Dialog>
+
+        {/* Edit Deal Dialog */}
+        <Dialog open={isEditDealOpen} onOpenChange={(open) => { setIsEditDealOpen(open); if (!open) { setEditingDeal(null); resetDealForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Deal</DialogTitle></DialogHeader>
+            {dealFormContent(true)}
+          </DialogContent>
+        </Dialog>
 
         <div className="grid gap-4 md:grid-cols-4">
           {[
@@ -260,7 +387,12 @@ export default function CRM() {
                           <TableCell className="font-semibold text-success">KES {lead.estimated_value.toLocaleString()}</TableCell>
                           <TableCell>{getStageBadge(lead.stage)}</TableCell>
                           <TableCell><Badge variant="outline" className="bg-muted/50">{lead.source || '—'}</Badge></TableCell>
-                          <TableCell><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteLeadMutation.mutate(lead)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openEditLead(lead)}><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteLeadMutation.mutate(lead)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>
@@ -293,7 +425,12 @@ export default function CRM() {
                             </div>
                           </TableCell>
                           <TableCell className="text-sm">{deal.close_date ? new Date(deal.close_date).toLocaleDateString() : '—'}</TableCell>
-                          <TableCell><Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteDealMutation.mutate(deal)}><Trash2 className="h-3.5 w-3.5" /></Button></TableCell>
+                          <TableCell>
+                            <div className="flex gap-1">
+                              <Button size="sm" variant="ghost" onClick={() => openEditDeal(deal)}><Pencil className="h-3.5 w-3.5" /></Button>
+                              <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteDealMutation.mutate(deal)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                            </div>
+                          </TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

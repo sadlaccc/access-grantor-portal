@@ -1,4 +1,4 @@
-import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package, Loader2, UserCircle, Trash2 } from 'lucide-react';
+import { Plus, Search, Laptop, Monitor, Smartphone, Tablet, Headphones, Package, Loader2, UserCircle, Trash2, Pencil } from 'lucide-react';
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
@@ -36,30 +36,20 @@ const statusColors: Record<string, string> = {
 };
 
 const typeIcons: Record<string, React.ElementType> = {
-  laptop: Laptop,
-  desktop: Monitor,
-  monitor: Monitor,
-  phone: Smartphone,
-  tablet: Tablet,
-  accessory: Headphones,
-  software: Package,
+  laptop: Laptop, desktop: Monitor, monitor: Monitor, phone: Smartphone,
+  tablet: Tablet, accessory: Headphones, software: Package,
 };
 
-const containerVariants = {
-  hidden: { opacity: 0 },
-  show: { opacity: 1, transition: { staggerChildren: 0.05 } },
-};
-
-const itemVariants = {
-  hidden: { opacity: 0, y: 12 },
-  show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } },
-};
+const containerVariants = { hidden: { opacity: 0 }, show: { opacity: 1, transition: { staggerChildren: 0.05 } } };
+const itemVariants = { hidden: { opacity: 0, y: 12 }, show: { opacity: 1, y: 0, transition: { duration: 0.3, ease: [0.22, 1, 0.36, 1] as [number, number, number, number] } } };
 
 export default function Assets() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingAsset, setEditingAsset] = useState<Asset | null>(null);
   const [name, setName] = useState('');
   const [serialNumber, setSerialNumber] = useState('');
   const [type, setType] = useState('laptop');
@@ -69,10 +59,7 @@ export default function Assets() {
   const { data: assets = [], isLoading } = useQuery({
     queryKey: ['it-assets'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('it_assets')
-        .select('*')
-        .order('created_at', { ascending: false });
+      const { data, error } = await supabase.from('it_assets').select('*').order('created_at', { ascending: false });
       if (error) throw error;
       return data as Asset[];
     },
@@ -81,28 +68,19 @@ export default function Assets() {
   const { data: profiles = [] } = useQuery({
     queryKey: ['profiles-for-assets'],
     queryFn: async () => {
-      const { data, error } = await supabase
-        .from('profiles')
-        .select('id, full_name, email');
+      const { data, error } = await supabase.from('profiles').select('id, full_name, email');
       if (error) throw error;
       return data;
     },
   });
 
-  const profileMap = profiles.reduce((acc, p) => {
-    acc[p.id] = p.full_name || p.email;
-    return acc;
-  }, {} as Record<string, string>);
+  const profileMap = profiles.reduce((acc, p) => { acc[p.id] = p.full_name || p.email; return acc; }, {} as Record<string, string>);
 
   const createAssetMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('it_assets').insert({
-        name,
-        serial_number: serialNumber || `SN-${Date.now().toString(36).toUpperCase()}`,
-        type,
-        status,
-        assigned_to: assignedTo,
-        created_by: user?.id,
+        name, serial_number: serialNumber || `SN-${Date.now().toString(36).toUpperCase()}`,
+        type, status, assigned_to: assignedTo, created_by: user?.id,
       });
       if (error) throw error;
     },
@@ -110,19 +88,34 @@ export default function Assets() {
       queryClient.invalidateQueries({ queryKey: ['it-assets'] });
       toast.success('Asset added successfully');
       setIsDialogOpen(false);
-      setName('');
-      setSerialNumber('');
-      setType('laptop');
-      setStatus('available');
-      setAssignedTo(null);
+      resetForm();
       if (user) {
         notifyAllUsers({ title: 'New Asset Added', message: `Asset "${name}" was added to IT inventory`, type: 'info', app: 'assets', excludeUserId: user.id });
         logAuditAction({ userId: user.id, action: 'create', tableName: 'it_assets', recordSummary: name });
       }
     },
-    onError: (error: Error) => {
-      toast.error('Failed to add asset: ' + error.message);
+    onError: (error: Error) => toast.error('Failed to add asset: ' + error.message),
+  });
+
+  const editAssetMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingAsset) return;
+      const { error } = await supabase.from('it_assets').update({
+        name, type, status, assigned_to: assignedTo,
+      }).eq('id', editingAsset.id);
+      if (error) throw error;
+      if (user) {
+        logAuditAction({ userId: user.id, action: 'update', tableName: 'it_assets', recordId: editingAsset.id, recordSummary: name });
+      }
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['it-assets'] });
+      toast.success('Asset updated');
+      setIsEditDialogOpen(false);
+      setEditingAsset(null);
+      resetForm();
+    },
+    onError: (error: Error) => toast.error('Failed to update asset: ' + error.message),
   });
 
   const deleteAssetMutation = useMutation({
@@ -139,10 +132,20 @@ export default function Assets() {
         logAuditAction({ userId: user.id, action: 'delete', tableName: 'it_assets', recordId: asset.id, recordSummary: asset.name });
       }
     },
-    onError: (error: Error) => {
-      toast.error('Failed to delete asset: ' + error.message);
-    },
+    onError: (error: Error) => toast.error('Failed to delete asset: ' + error.message),
   });
+
+  const resetForm = () => { setName(''); setSerialNumber(''); setType('laptop'); setStatus('available'); setAssignedTo(null); };
+
+  const openEditDialog = (asset: Asset) => {
+    setEditingAsset(asset);
+    setName(asset.name);
+    setSerialNumber(asset.serial_number);
+    setType(asset.type);
+    setStatus(asset.status);
+    setAssignedTo(asset.assigned_to);
+    setIsEditDialogOpen(true);
+  };
 
   const filteredAssets = assets.filter(
     (asset) =>
@@ -151,25 +154,74 @@ export default function Assets() {
       (asset.assigned_to && profileMap[asset.assigned_to]?.toLowerCase().includes(searchQuery.toLowerCase()))
   );
 
-  const statusCounts = assets.reduce((acc, asset) => {
-    acc[asset.status] = (acc[asset.status] || 0) + 1;
-    return acc;
-  }, {} as Record<string, number>);
+  const statusCounts = assets.reduce((acc, asset) => { acc[asset.status] = (acc[asset.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
   if (isLoading) {
-    return (
-      <MainLayout>
-        <div className="flex h-[50vh] items-center justify-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-        </div>
-      </MainLayout>
-    );
+    return (<MainLayout><div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></MainLayout>);
   }
+
+  const assetFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Asset Name *</Label>
+        <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="MacBook Pro 16&quot;" />
+      </div>
+      {!isEdit && (
+        <div className="space-y-2">
+          <Label>Serial Number</Label>
+          <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Auto-generated if empty" />
+        </div>
+      )}
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Type</Label>
+          <Select value={type} onValueChange={setType}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="laptop">Laptop</SelectItem>
+              <SelectItem value="desktop">Desktop</SelectItem>
+              <SelectItem value="monitor">Monitor</SelectItem>
+              <SelectItem value="phone">Phone</SelectItem>
+              <SelectItem value="tablet">Tablet</SelectItem>
+              <SelectItem value="accessory">Accessory</SelectItem>
+              <SelectItem value="software">Software</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Status</Label>
+          <Select value={status} onValueChange={setStatus}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="available">Available</SelectItem>
+              <SelectItem value="assigned">Assigned</SelectItem>
+              <SelectItem value="maintenance">Maintenance</SelectItem>
+              <SelectItem value="retired">Retired</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <div className="space-y-2">
+        <Label>Assign To</Label>
+        <Select value={assignedTo || ''} onValueChange={(v) => setAssignedTo(v || null)}>
+          <SelectTrigger><SelectValue placeholder="Select a person (optional)" /></SelectTrigger>
+          <SelectContent>
+            {profiles.map((profile) => (
+              <SelectItem key={profile.id} value={profile.id}>{profile.full_name || profile.email}</SelectItem>
+            ))}
+          </SelectContent>
+        </Select>
+      </div>
+      <Button className="w-full" onClick={() => isEdit ? editAssetMutation.mutate() : createAssetMutation.mutate()} disabled={!name || (isEdit ? editAssetMutation.isPending : createAssetMutation.isPending)}>
+        {(isEdit ? editAssetMutation.isPending : createAssetMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isEdit ? 'Save Changes' : 'Add Asset'}
+      </Button>
+    </div>
+  );
 
   return (
     <MainLayout>
       <div className="p-6 lg:p-8 space-y-6">
-        {/* Header */}
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
             <h1 className="font-display text-3xl font-bold text-foreground">IT Assets</h1>
@@ -177,87 +229,28 @@ export default function Assets() {
           </div>
           <Dialog open={isDialogOpen} onOpenChange={setIsDialogOpen}>
             <DialogTrigger asChild>
-              <Button variant="gradient" className="gap-2">
-                <Plus className="h-4 w-4" />
-                Add Asset
-              </Button>
+              <Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />Add Asset</Button>
             </DialogTrigger>
             <DialogContent>
-              <DialogHeader>
-                <DialogTitle>Add New Asset</DialogTitle>
-              </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Asset Name *</Label>
-                  <Input value={name} onChange={(e) => setName(e.target.value)} placeholder="MacBook Pro 16&quot;" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Serial Number</Label>
-                  <Input value={serialNumber} onChange={(e) => setSerialNumber(e.target.value)} placeholder="Auto-generated if empty" />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Type</Label>
-                    <Select value={type} onValueChange={setType}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="laptop">Laptop</SelectItem>
-                        <SelectItem value="desktop">Desktop</SelectItem>
-                        <SelectItem value="monitor">Monitor</SelectItem>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="tablet">Tablet</SelectItem>
-                        <SelectItem value="accessory">Accessory</SelectItem>
-                        <SelectItem value="software">Software</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Status</Label>
-                    <Select value={status} onValueChange={setStatus}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="available">Available</SelectItem>
-                        <SelectItem value="assigned">Assigned</SelectItem>
-                        <SelectItem value="maintenance">Maintenance</SelectItem>
-                        <SelectItem value="retired">Retired</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <div className="space-y-2">
-                  <Label>Assign To</Label>
-                  <Select value={assignedTo || ''} onValueChange={(v) => setAssignedTo(v || null)}>
-                    <SelectTrigger>
-                      <SelectValue placeholder="Select a person (optional)" />
-                    </SelectTrigger>
-                    <SelectContent>
-                      {profiles.map((profile) => (
-                        <SelectItem key={profile.id} value={profile.id}>
-                          {profile.full_name || profile.email}
-                        </SelectItem>
-                      ))}
-                    </SelectContent>
-                  </Select>
-                </div>
-                <Button className="w-full" onClick={() => createAssetMutation.mutate()} disabled={!name || createAssetMutation.isPending}>
-                  {createAssetMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
-                  Add Asset
-                </Button>
-              </div>
+              <DialogHeader><DialogTitle>Add New Asset</DialogTitle></DialogHeader>
+              {assetFormContent(false)}
             </DialogContent>
           </Dialog>
         </div>
 
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setEditingAsset(null); resetForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Asset</DialogTitle></DialogHeader>
+            {assetFormContent(true)}
+          </DialogContent>
+        </Dialog>
+
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {['available', 'assigned', 'maintenance', 'retired'].map((s) => (
-            <motion.div
-              key={s}
-              initial={{ opacity: 0, y: 10 }}
-              animate={{ opacity: 1, y: 0 }}
-              transition={{ duration: 0.3 }}
-              className="rounded-2xl border border-border bg-card p-5 text-center card-interactive"
-            >
+            <motion.div key={s} initial={{ opacity: 0, y: 10 }} animate={{ opacity: 1, y: 0 }} transition={{ duration: 0.3 }}
+              className="rounded-2xl border border-border bg-card p-5 text-center card-interactive">
               <span className="text-3xl font-bold text-card-foreground">{statusCounts[s] || 0}</span>
               <p className="mt-1 text-sm capitalize text-muted-foreground">{s}</p>
             </motion.div>
@@ -276,42 +269,27 @@ export default function Assets() {
             {assets.length === 0 ? 'No assets yet. Add your first asset above.' : 'No assets found matching your search.'}
           </div>
         ) : (
-          <motion.div
-            variants={containerVariants}
-            initial="hidden"
-            animate="show"
-            className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4"
-          >
+          <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
             {filteredAssets.map((asset) => {
               const Icon = typeIcons[asset.type] || Package;
               return (
-                <motion.div
-                  key={asset.id}
-                  variants={itemVariants}
-                  className="group rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg"
-                >
+                <motion.div key={asset.id} variants={itemVariants}
+                  className="group rounded-2xl border border-border bg-card p-5 transition-all duration-300 hover:border-primary/30 hover:shadow-lg">
                   <div className="flex items-start justify-between">
                     <div className="flex h-12 w-12 items-center justify-center rounded-xl bg-primary/10 transition-colors group-hover:bg-primary/15">
                       <Icon className="h-6 w-6 text-primary" />
                     </div>
-                    <div className="flex items-center gap-2">
-                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[asset.status])}>
-                        {asset.status}
-                      </Badge>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
-                        onClick={() => deleteAssetMutation.mutate(asset)}
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </Button>
+                    <div className="flex items-center gap-1">
+                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[asset.status])}>{asset.status}</Badge>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity"
+                        onClick={() => openEditDialog(asset)}><Pencil className="h-3.5 w-3.5" /></Button>
+                      <Button variant="ghost" size="icon" className="h-7 w-7 text-destructive opacity-0 group-hover:opacity-100 transition-opacity hover:text-destructive"
+                        onClick={() => deleteAssetMutation.mutate(asset)}><Trash2 className="h-3.5 w-3.5" /></Button>
                     </div>
                   </div>
                   <h3 className="mt-4 font-semibold text-card-foreground leading-tight">{asset.name}</h3>
                   <p className="mt-1 text-xs font-mono text-muted-foreground">{asset.serial_number}</p>
 
-                  {/* Assigned To section */}
                   <div className="mt-4 pt-3 border-t border-border">
                     {asset.assigned_to && profileMap[asset.assigned_to] ? (
                       <div className="flex items-center gap-2">
