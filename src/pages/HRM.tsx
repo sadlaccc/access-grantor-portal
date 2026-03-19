@@ -159,6 +159,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request submitted');
+      notifyAllUsers({ title: 'New Leave Request', message: `${leaveType} leave requested`, type: 'create', app: 'hrm', excludeUserId: user?.id });
       setIsLeaveDialogOpen(false);
       setLeaveType('annual'); setLeaveStart(undefined); setLeaveEnd(undefined); setLeaveReason('');
     },
