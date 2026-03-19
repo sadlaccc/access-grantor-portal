@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
@@ -69,7 +71,7 @@ const Finance = () => {
   // Invoice form state
   const [invoiceClient, setInvoiceClient] = useState('');
   const [invoiceEmail, setInvoiceEmail] = useState('');
-  const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  const [invoiceDueDate, setInvoiceDueDate] = useState<Date | undefined>();
   const [invoiceItems, setInvoiceItems] = useState<{ description: string; quantity: number; price: number }[]>([
     { description: '', quantity: 1, price: 0 }
   ]);
@@ -79,15 +81,15 @@ const Finance = () => {
   const [expenseCategory, setExpenseCategory] = useState('');
   const [expenseAmount, setExpenseAmount] = useState('');
   const [expenseVendor, setExpenseVendor] = useState('');
-  const [expenseDate, setExpenseDate] = useState(new Date().toISOString().split('T')[0]);
+  const [expenseDate, setExpenseDate] = useState<Date | undefined>(new Date());
   const [expenseReceipt, setExpenseReceipt] = useState('');
 
   // Budget form state
   const [budgetName, setBudgetName] = useState('');
   const [budgetCategory, setBudgetCategory] = useState('');
   const [budgetAmount, setBudgetAmount] = useState('');
-  const [budgetStart, setBudgetStart] = useState('');
-  const [budgetEnd, setBudgetEnd] = useState('');
+  const [budgetStart, setBudgetStart] = useState<Date | undefined>();
+  const [budgetEnd, setBudgetEnd] = useState<Date | undefined>();
 
   // Fetch invoices
   const { data: invoices = [], isLoading: invoicesLoading } = useQuery({
@@ -148,7 +150,7 @@ const Finance = () => {
           tax_rate: taxRate,
           tax_amount: taxAmount,
           total_amount: totalAmount,
-          due_date: invoiceDueDate,
+          due_date: invoiceDueDate ? format(invoiceDueDate, 'yyyy-MM-dd') : null,
           created_by: user?.id,
         })
         .select()
@@ -192,7 +194,7 @@ const Finance = () => {
         description: expenseDescription,
         category: expenseCategory,
         amount: parseFloat(expenseAmount),
-        expense_date: expenseDate,
+        expense_date: expenseDate ? format(expenseDate, 'yyyy-MM-dd') : null,
         vendor: expenseVendor || null,
         receipt_url: expenseReceipt || null,
         status: 'pending',
@@ -218,8 +220,8 @@ const Finance = () => {
         department: budgetCategory,
         allocated_amount: parseFloat(budgetAmount),
         spent_amount: 0,
-        start_date: budgetStart,
-        end_date: budgetEnd,
+        start_date: budgetStart ? format(budgetStart, 'yyyy-MM-dd') : null,
+        end_date: budgetEnd ? format(budgetEnd, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -268,7 +270,7 @@ const Finance = () => {
   const resetInvoiceForm = () => {
     setInvoiceClient('');
     setInvoiceEmail('');
-    setInvoiceDueDate('');
+    setInvoiceDueDate(undefined);
     setInvoiceItems([{ description: '', quantity: 1, price: 0 }]);
   };
 
@@ -277,7 +279,7 @@ const Finance = () => {
     setExpenseCategory('');
     setExpenseAmount('');
     setExpenseVendor('');
-    setExpenseDate(new Date().toISOString().split('T')[0]);
+    setExpenseDate(new Date());
     setExpenseReceipt('');
   };
 
@@ -285,8 +287,8 @@ const Finance = () => {
     setBudgetName('');
     setBudgetCategory('');
     setBudgetAmount('');
-    setBudgetStart('');
-    setBudgetEnd('');
+    setBudgetStart(undefined);
+    setBudgetEnd(undefined);
   };
 
   const addInvoiceItem = () => {
@@ -402,7 +404,7 @@ const Finance = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Due Date</Label>
-                      <Input type="date" value={invoiceDueDate} onChange={e => setInvoiceDueDate(e.target.value)} required />
+                      <DatePicker date={invoiceDueDate} onDateChange={setInvoiceDueDate} placeholder="Select due date" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
@@ -522,7 +524,7 @@ const Finance = () => {
                       </div>
                       <div className="space-y-2">
                         <Label>Date</Label>
-                        <Input type="date" value={expenseDate} onChange={e => setExpenseDate(e.target.value)} required />
+                        <DatePicker date={expenseDate} onDateChange={setExpenseDate} placeholder="Select date" />
                       </div>
                     </div>
                     <div className="space-y-2">
@@ -587,11 +589,11 @@ const Finance = () => {
                     <div className="grid grid-cols-2 gap-4">
                       <div className="space-y-2">
                         <Label>Period Start</Label>
-                        <Input type="date" value={budgetStart} onChange={e => setBudgetStart(e.target.value)} required />
+                        <DatePicker date={budgetStart} onDateChange={setBudgetStart} placeholder="Start date" />
                       </div>
                       <div className="space-y-2">
                         <Label>Period End</Label>
-                        <Input type="date" value={budgetEnd} onChange={e => setBudgetEnd(e.target.value)} required />
+                        <DatePicker date={budgetEnd} onDateChange={setBudgetEnd} placeholder="End date" />
                       </div>
                     </div>
                     <Button

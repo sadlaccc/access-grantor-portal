@@ -12,6 +12,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { DatePicker } from '@/components/ui/date-picker';
 import {
   Users, Calendar, Clock, Award, Search, Plus, GraduationCap, Loader2,
   Briefcase, Pencil, Megaphone, Trash2, Bell, Send,
@@ -74,14 +75,14 @@ export default function HRM() {
 
   // Leave form
   const [leaveType, setLeaveType] = useState('annual');
-  const [leaveStart, setLeaveStart] = useState('');
-  const [leaveEnd, setLeaveEnd] = useState('');
+  const [leaveStart, setLeaveStart] = useState<Date | undefined>();
+  const [leaveEnd, setLeaveEnd] = useState<Date | undefined>();
   const [leaveReason, setLeaveReason] = useState('');
 
   // Training form
   const [trainingName, setTrainingName] = useState('');
   const [trainingDesc, setTrainingDesc] = useState('');
-  const [trainingDueDate, setTrainingDueDate] = useState('');
+  const [trainingDueDate, setTrainingDueDate] = useState<Date | undefined>();
 
   // Add employee form
   const [empEmail, setEmpEmail] = useState('');
@@ -146,11 +147,11 @@ export default function HRM() {
   // Mutations
   const createLeaveMutation = useMutation({
     mutationFn: async () => {
-      const start = new Date(leaveStart);
-      const end = new Date(leaveEnd);
-      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (!leaveStart || !leaveEnd) throw new Error('Dates required');
+      const days = Math.ceil((leaveEnd.getTime() - leaveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (days <= 0) throw new Error('End date must be after start date');
       const { error } = await supabase.from('leave_requests').insert({
-        user_id: user?.id!, leave_type: leaveType, start_date: leaveStart, end_date: leaveEnd, days, reason: leaveReason || null,
+        user_id: user?.id!, leave_type: leaveType, start_date: format(leaveStart, 'yyyy-MM-dd'), end_date: format(leaveEnd, 'yyyy-MM-dd'), days, reason: leaveReason || null,
       });
       if (error) throw error;
     },
@@ -158,7 +159,7 @@ export default function HRM() {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request submitted');
       setIsLeaveDialogOpen(false);
-      setLeaveType('annual'); setLeaveStart(''); setLeaveEnd(''); setLeaveReason('');
+      setLeaveType('annual'); setLeaveStart(undefined); setLeaveEnd(undefined); setLeaveReason('');
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -177,7 +178,7 @@ export default function HRM() {
   const createTrainingMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('trainings').insert({
-        name: trainingName, description: trainingDesc || null, due_date: trainingDueDate || null, created_by: user?.id,
+        name: trainingName, description: trainingDesc || null, due_date: trainingDueDate ? format(trainingDueDate, 'yyyy-MM-dd') : null, created_by: user?.id,
       });
       if (error) throw error;
     },
@@ -185,7 +186,7 @@ export default function HRM() {
       queryClient.invalidateQueries({ queryKey: ['trainings'] });
       toast.success('Training created');
       setIsTrainingDialogOpen(false);
-      setTrainingName(''); setTrainingDesc(''); setTrainingDueDate('');
+      setTrainingName(''); setTrainingDesc(''); setTrainingDueDate(undefined);
     },
     onError: (e: Error) => toast.error(e.message),
   });
@@ -371,8 +372,8 @@ export default function HRM() {
                     </Select>
                   </div>
                   <div className="grid grid-cols-2 gap-4">
-                    <div className="space-y-2"><Label>Start Date *</Label><Input type="date" value={leaveStart} onChange={(e) => setLeaveStart(e.target.value)} /></div>
-                    <div className="space-y-2"><Label>End Date *</Label><Input type="date" value={leaveEnd} onChange={(e) => setLeaveEnd(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Start Date *</Label><DatePicker date={leaveStart} onDateChange={setLeaveStart} placeholder="Start date" /></div>
+                    <div className="space-y-2"><Label>End Date *</Label><DatePicker date={leaveEnd} onDateChange={setLeaveEnd} placeholder="End date" /></div>
                   </div>
                   <div className="space-y-2"><Label>Reason</Label><Input value={leaveReason} onChange={(e) => setLeaveReason(e.target.value)} placeholder="Optional reason" /></div>
                   <Button className="w-full" onClick={() => createLeaveMutation.mutate()} disabled={!leaveStart || !leaveEnd || createLeaveMutation.isPending}>
@@ -561,7 +562,7 @@ export default function HRM() {
                       <div className="space-y-4">
                         <div className="space-y-2"><Label>Training Name *</Label><Input value={trainingName} onChange={(e) => setTrainingName(e.target.value)} placeholder="Cybersecurity Basics" /></div>
                         <div className="space-y-2"><Label>Description</Label><Textarea value={trainingDesc} onChange={(e) => setTrainingDesc(e.target.value)} placeholder="Describe the training..." rows={3} /></div>
-                        <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={trainingDueDate} onChange={(e) => setTrainingDueDate(e.target.value)} /></div>
+                        <div className="space-y-2"><Label>Due Date</Label><DatePicker date={trainingDueDate} onDateChange={setTrainingDueDate} placeholder="Select due date" /></div>
                         <Button className="w-full" onClick={() => createTrainingMutation.mutate()} disabled={!trainingName || createTrainingMutation.isPending}>
                           {createTrainingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Training
                         </Button>

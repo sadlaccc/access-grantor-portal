@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
+import { format } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -68,7 +70,7 @@ export default function CRM() {
   const [dealName, setDealName] = useState('');
   const [dealCompany, setDealCompany] = useState('');
   const [dealValue, setDealValue] = useState('');
-  const [dealCloseDate, setDealCloseDate] = useState('');
+  const [dealCloseDate, setDealCloseDate] = useState<Date | undefined>();
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ['crm-leads'],
@@ -124,7 +126,7 @@ export default function CRM() {
         name: dealName,
         company: dealCompany,
         value: parseFloat(dealValue) || 0,
-        close_date: dealCloseDate || null,
+        close_date: dealCloseDate ? format(dealCloseDate, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -133,7 +135,7 @@ export default function CRM() {
       queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
       toast.success('Deal created successfully');
       setIsDealDialogOpen(false);
-      setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate('');
+      setDealName(''); setDealCompany(''); setDealValue(''); setDealCloseDate(undefined);
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
   });
@@ -179,7 +181,7 @@ export default function CRM() {
                   <div className="space-y-2"><Label>Company *</Label><Input value={dealCompany} onChange={(e) => setDealCompany(e.target.value)} placeholder="Acme Corp" /></div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Value (KES)</Label><Input type="number" value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder="50000" /></div>
-                    <div className="space-y-2"><Label>Close Date</Label><Input type="date" value={dealCloseDate} onChange={(e) => setDealCloseDate(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Close Date</Label><DatePicker date={dealCloseDate} onDateChange={setDealCloseDate} placeholder="Select close date" /></div>
                   </div>
                   <Button className="w-full" onClick={() => createDealMutation.mutate()} disabled={!dealName || !dealCompany || createDealMutation.isPending}>
                     {createDealMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Deal

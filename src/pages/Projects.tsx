@@ -1,5 +1,7 @@
 import { useState } from 'react';
 import { Plus, Loader2, FolderKanban, Calendar } from 'lucide-react';
+import { format } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { MainLayout } from '@/components/layout/MainLayout';
@@ -52,7 +54,7 @@ export default function Projects() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('planning');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],
@@ -72,7 +74,7 @@ export default function Projects() {
         name,
         description: description || null,
         status,
-        start_date: startDate || null,
+        start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
@@ -84,7 +86,7 @@ export default function Projects() {
       setName('');
       setDescription('');
       setStatus('planning');
-      setStartDate('');
+      setStartDate(undefined);
     },
     onError: (error: Error) => {
       toast.error('Failed to create project: ' + error.message);
@@ -162,7 +164,7 @@ export default function Projects() {
                   </div>
                   <div className="space-y-2">
                     <Label>Start Date</Label>
-                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    <DatePicker date={startDate} onDateChange={setStartDate} placeholder="Select start date" />
                   </div>
                 </div>
                 <Button className="w-full" onClick={() => createProjectMutation.mutate()} disabled={!name || createProjectMutation.isPending}>
