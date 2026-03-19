@@ -404,7 +404,7 @@ const Finance = () => {
                     </div>
                     <div className="space-y-2">
                       <Label>Due Date</Label>
-                      <Input type="date" value={invoiceDueDate} onChange={e => setInvoiceDueDate(e.target.value)} required />
+                      <DatePicker date={invoiceDueDate} onDateChange={setInvoiceDueDate} placeholder="Select due date" />
                     </div>
                     <div className="space-y-2">
                       <div className="flex items-center justify-between">
