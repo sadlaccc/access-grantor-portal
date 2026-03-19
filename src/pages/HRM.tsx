@@ -388,7 +388,7 @@ export default function HRM() {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ['performance-reviews'] });
       toast.success('Performance review created');
-      logAuditAction('performance_reviews', 'CREATE', null, `Review for ${profileMap[reviewEmployeeId] || 'employee'}`);
+      logAuditAction({ userId: user?.id || '', action: 'CREATE', tableName: 'performance_reviews', recordSummary: `Review for ${profileMap[reviewEmployeeId] || 'employee'}` });
       notifyAllUsers({ title: 'New Performance Review', message: `Review created for ${profileMap[reviewEmployeeId] || 'an employee'}`, type: 'create', app: 'hrm', excludeUserId: user?.id });
       setIsReviewDialogOpen(false);
       setReviewEmployeeId(''); setReviewPeriod(''); setReviewRating('3'); setReviewStrengths(''); setReviewImprovements(''); setReviewGoals(''); setReviewComments('');
