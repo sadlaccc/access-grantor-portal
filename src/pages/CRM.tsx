@@ -126,7 +126,7 @@ export default function CRM() {
         name: dealName,
         company: dealCompany,
         value: parseFloat(dealValue) || 0,
-        close_date: dealCloseDate || null,
+        close_date: dealCloseDate ? format(dealCloseDate, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
