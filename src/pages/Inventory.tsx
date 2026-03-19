@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2 } from 'lucide-react';
+import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2, Trash2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -14,6 +14,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { supabase } from '@/integrations/supabase/client';
 import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
+import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
 
 interface Product {
   id: string;
@@ -95,9 +96,55 @@ const Inventory = () => {
       toast({ title: 'Product added successfully' });
       setIsProductDialogOpen(false);
       resetProductForm();
+      if (user) {
+        notifyAllUsers({ title: 'New Product Added', message: `Product "${productName}" was added to inventory`, type: 'info', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'create', tableName: 'inventory_products', recordSummary: productName });
+      }
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to add product', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Delete product mutation
+  const deleteProductMutation = useMutation({
+    mutationFn: async (product: Product) => {
+      const { error } = await supabase.from('inventory_products').delete().eq('id', product.id);
+      if (error) throw error;
+      return product;
+    },
+    onSuccess: (product) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      toast({ title: 'Product deleted' });
+      if (user) {
+        notifyAllUsers({ title: 'Product Deleted', message: `Product "${product.name}" was removed from inventory`, type: 'warning', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'delete', tableName: 'inventory_products', recordId: product.id, recordSummary: product.name });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to delete product', description: error.message, variant: 'destructive' });
+    },
+  });
+
+  // Delete order mutation
+  const deleteOrderMutation = useMutation({
+    mutationFn: async (order: Order) => {
+      // Delete order items first
+      await supabase.from('inventory_order_items').delete().eq('order_id', order.id);
+      const { error } = await supabase.from('inventory_orders').delete().eq('id', order.id);
+      if (error) throw error;
+      return order;
+    },
+    onSuccess: (order) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-orders'] });
+      toast({ title: 'Order deleted' });
+      if (user) {
+        notifyAllUsers({ title: 'Order Deleted', message: `Order "${order.order_number}" was deleted`, type: 'warning', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'delete', tableName: 'inventory_orders', recordId: order.id, recordSummary: order.order_number });
+      }
+    },
+    onError: (error: Error) => {
+      toast({ title: 'Failed to delete order', description: error.message, variant: 'destructive' });
     },
   });
 
@@ -125,7 +172,6 @@ const Inventory = () => {
 
       if (orderError) throw orderError;
 
-      // Add order items
       const orderItems = orderProducts.map(op => {
         const product = products.find(p => p.id === op.productId);
         return {
@@ -136,18 +182,20 @@ const Inventory = () => {
         };
       });
 
-      const { error: itemsError } = await supabase
-        .from('inventory_order_items')
-        .insert(orderItems);
-
+      const { error: itemsError } = await supabase.from('inventory_order_items').insert(orderItems);
       if (itemsError) throw itemsError;
+      return orderNumber;
     },
-    onSuccess: () => {
+    onSuccess: (orderNumber) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-orders'] });
       toast({ title: 'Order created successfully' });
       setIsOrderDialogOpen(false);
       setOrderSupplier('');
       setOrderProducts([]);
+      if (user) {
+        notifyAllUsers({ title: 'New Order Created', message: `Purchase order "${orderNumber}" was created`, type: 'info', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'create', tableName: 'inventory_orders', recordSummary: orderNumber });
+      }
     },
     onError: (error: Error) => {
       toast({ title: 'Failed to create order', description: error.message, variant: 'destructive' });
@@ -163,7 +211,6 @@ const Inventory = () => {
         .eq('id', orderId);
       if (error) throw error;
 
-      // If order is received, update product quantities
       if (status === 'received') {
         const { data: orderItems } = await supabase
           .from('inventory_order_items')
@@ -182,11 +229,17 @@ const Inventory = () => {
           }
         }
       }
+      return { orderId, status };
     },
-    onSuccess: () => {
+    onSuccess: ({ orderId, status }) => {
       queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
       queryClient.invalidateQueries({ queryKey: ['inventory-orders'] });
       toast({ title: 'Order status updated' });
+      const order = orders.find(o => o.id === orderId);
+      if (user && order) {
+        notifyAllUsers({ title: 'Order Updated', message: `Order "${order.order_number}" marked as ${status}`, type: 'info', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'update', tableName: 'inventory_orders', recordId: orderId, recordSummary: `${order.order_number} → ${status}` });
+      }
     },
   });
 
@@ -311,9 +364,7 @@ const Inventory = () => {
                         setOrderProducts([...orderProducts, { productId, quantity: 1 }]);
                       }
                     }}>
-                      <SelectTrigger>
-                        <SelectValue placeholder="Add product to order" />
-                      </SelectTrigger>
+                      <SelectTrigger><SelectValue placeholder="Add product to order" /></SelectTrigger>
                       <SelectContent>
                         {products.map(p => (
                           <SelectItem key={p.id} value={p.id}>{p.name} ({p.sku})</SelectItem>
@@ -334,18 +385,11 @@ const Inventory = () => {
                                 min="1"
                                 value={op.quantity}
                                 onChange={e => setOrderProducts(ops =>
-                                  ops.map(o => o.productId === op.productId
-                                    ? { ...o, quantity: parseInt(e.target.value) || 1 }
-                                    : o
-                                  )
+                                  ops.map(o => o.productId === op.productId ? { ...o, quantity: parseInt(e.target.value) || 1 } : o)
                                 )}
                                 className="w-20"
                               />
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setOrderProducts(ops => ops.filter(o => o.productId !== op.productId))}
-                              >
+                              <Button variant="ghost" size="sm" onClick={() => setOrderProducts(ops => ops.filter(o => o.productId !== op.productId))}>
                                 Remove
                               </Button>
                             </div>
@@ -429,12 +473,7 @@ const Inventory = () => {
                 <CardTitle>Product Inventory</CardTitle>
                 <div className="relative w-64">
                   <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                  <Input
-                    placeholder="Search products..."
-                    value={searchQuery}
-                    onChange={e => setSearchQuery(e.target.value)}
-                    className="pl-10"
-                  />
+                  <Input placeholder="Search products..." value={searchQuery} onChange={e => setSearchQuery(e.target.value)} className="pl-10" />
                 </div>
               </CardHeader>
               <CardContent>
@@ -447,6 +486,7 @@ const Inventory = () => {
                       <TableHead className="text-right">Quantity</TableHead>
                       <TableHead className="text-right">Unit Price</TableHead>
                       <TableHead>Status</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -460,12 +500,16 @@ const Inventory = () => {
                         <TableCell>
                           {product.quantity_in_stock <= product.reorder_level ? (
                             <Badge variant="destructive" className="flex w-fit items-center gap-1">
-                              <TrendingDown className="h-3 w-3" />
-                              Low Stock
+                              <TrendingDown className="h-3 w-3" />Low Stock
                             </Badge>
                           ) : (
                             <Badge variant="secondary" className="bg-success/10 text-success">In Stock</Badge>
                           )}
+                        </TableCell>
+                        <TableCell className="text-right">
+                          <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteProductMutation.mutate(product)}>
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -489,7 +533,7 @@ const Inventory = () => {
                       <TableHead>Date</TableHead>
                       <TableHead className="text-right">Amount</TableHead>
                       <TableHead>Status</TableHead>
-                      <TableHead>Actions</TableHead>
+                      <TableHead className="text-right">Actions</TableHead>
                     </TableRow>
                   </TableHeader>
                   <TableBody>
@@ -500,24 +544,21 @@ const Inventory = () => {
                         <TableCell>{new Date(order.created_at).toLocaleDateString()}</TableCell>
                         <TableCell className="text-right">KES {order.total_amount.toLocaleString()}</TableCell>
                         <TableCell>
-                          <Badge variant={
-                            order.status === 'received' ? 'default' :
-                            order.status === 'pending' ? 'secondary' :
-                            'outline'
-                          }>
+                          <Badge variant={order.status === 'received' ? 'default' : order.status === 'pending' ? 'secondary' : 'outline'}>
                             {order.status}
                           </Badge>
                         </TableCell>
-                        <TableCell>
-                          {order.status === 'pending' && (
-                            <Button
-                              size="sm"
-                              variant="outline"
-                              onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'received' })}
-                            >
-                              Mark Received
+                        <TableCell className="text-right">
+                          <div className="flex items-center justify-end gap-1">
+                            {order.status === 'pending' && (
+                              <Button size="sm" variant="outline" onClick={() => updateOrderStatusMutation.mutate({ orderId: order.id, status: 'received' })}>
+                                Mark Received
+                              </Button>
+                            )}
+                            <Button variant="ghost" size="icon" className="text-destructive hover:text-destructive" onClick={() => deleteOrderMutation.mutate(order)}>
+                              <Trash2 className="h-4 w-4" />
                             </Button>
-                          )}
+                          </div>
                         </TableCell>
                       </TableRow>
                     ))}
@@ -556,9 +597,7 @@ const Inventory = () => {
                           <TableCell>{product.sku}</TableCell>
                           <TableCell className="text-right text-destructive font-semibold">{product.quantity_in_stock}</TableCell>
                           <TableCell className="text-right">{product.reorder_level}</TableCell>
-                          <TableCell className="text-right text-destructive">
-                            {product.reorder_level - product.quantity_in_stock}
-                          </TableCell>
+                          <TableCell className="text-right text-destructive">{product.reorder_level - product.quantity_in_stock}</TableCell>
                         </TableRow>
                       ))}
                     </TableBody>

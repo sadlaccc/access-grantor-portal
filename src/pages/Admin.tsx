@@ -98,6 +98,7 @@ export default function Admin() {
   const [isEditAppsDialogOpen, setIsEditAppsDialogOpen] = useState(false);
   const [isResetPasswordDialogOpen, setIsResetPasswordDialogOpen] = useState(false);
   const [selectedUserForReset, setSelectedUserForReset] = useState<Profile | null>(null);
+  const [auditSearchQuery, setAuditSearchQuery] = useState('');
 
   // New user form state
   const [newUserForm, setNewUserForm] = useState({
@@ -167,6 +168,27 @@ export default function Admin() {
     },
   });
 
+  // Fetch audit log
+  const { data: auditLog = [], isLoading: auditLoading } = useQuery({
+    queryKey: ['audit-log'],
+    queryFn: async () => {
+      const { data, error } = await supabase
+        .from('audit_log')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(200);
+      if (error) throw error;
+      return data as AuditLogEntry[];
+    },
+  });
+
+  // Profile map for audit log user names
+  const profileMap = useMemo(() => {
+    const map: Record<string, string> = {};
+    profiles.forEach(p => { map[p.id] = p.full_name || p.email; });
+    return map;
+  }, [profiles]);
+
   // Create user mutation
   const createUserMutation = useMutation({
     mutationFn: async (userData: typeof newUserForm) => {
@@ -203,16 +225,11 @@ export default function Admin() {
   // Update app assignments mutation
   const updateAppsMutation = useMutation({
     mutationFn: async ({ userId, appIds }: { userId: string; appIds: string[] }) => {
-      // Get current assignments
       const currentAssignments = appAssignments.filter(a => a.user_id === userId);
       const currentAppIds = currentAssignments.map(a => a.app_id);
-
-      // Apps to add
       const toAdd = appIds.filter(id => !currentAppIds.includes(id));
-      // Apps to remove
       const toRemove = currentAppIds.filter(id => !appIds.includes(id));
 
-      // Add new assignments
       if (toAdd.length > 0) {
         const { error } = await supabase
           .from('user_app_assignments')
@@ -220,7 +237,6 @@ export default function Admin() {
         if (error) throw error;
       }
 
-      // Remove old assignments
       if (toRemove.length > 0) {
         const { error } = await supabase
           .from('user_app_assignments')
@@ -334,7 +350,6 @@ export default function Admin() {
     return appAssignments.filter(a => a.user_id === userId).length;
   };
 
-  // Get unique departments for filter
   const departments = useMemo(() => {
     const depts = profiles
       .map(p => p.department)
@@ -351,15 +366,33 @@ export default function Admin() {
     return matchesSearch && matchesDepartment;
   });
 
+  const filteredAuditLog = auditLog.filter((entry) => {
+    if (!auditSearchQuery) return true;
+    const q = auditSearchQuery.toLowerCase();
+    return (
+      entry.action.toLowerCase().includes(q) ||
+      entry.table_name.toLowerCase().includes(q) ||
+      (entry.record_summary?.toLowerCase().includes(q) ?? false) ||
+      (entry.user_id && profileMap[entry.user_id]?.toLowerCase().includes(q))
+    );
+  });
+
+  const getActionColor = (action: string) => {
+    if (action.toLowerCase().includes('delete')) return 'destructive';
+    if (action.toLowerCase().includes('create') || action.toLowerCase().includes('add')) return 'default';
+    if (action.toLowerCase().includes('update') || action.toLowerCase().includes('edit')) return 'secondary';
+    return 'outline';
+  };
+
   return (
     <MainLayout>
       <div className="p-8">
         {/* Header */}
         <div className="mb-8 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
           <div>
-            <h1 className="font-display text-3xl font-bold text-foreground">User Management</h1>
+            <h1 className="font-display text-3xl font-bold text-foreground">Administration</h1>
             <p className="mt-1 text-muted-foreground">
-              Add users and manage their app assignments
+              Manage users, app assignments, and view activity logs
             </p>
           </div>
           <Dialog open={isAddDialogOpen} onOpenChange={setIsAddDialogOpen}>
@@ -467,179 +500,200 @@ export default function Admin() {
           </Dialog>
         </div>
 
-        {/* Search and Filter */}
-        <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
-          <div className="relative flex-1 max-w-md">
-            <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-            <Input
-              placeholder="Search users..."
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              className="pl-10"
-            />
-          </div>
-          <div className="flex items-center gap-2">
-            <Filter className="h-4 w-4 text-muted-foreground" />
-            <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
-              <SelectTrigger className="w-[180px]">
-                <SelectValue placeholder="All Departments" />
-              </SelectTrigger>
-              <SelectContent>
-                <SelectItem value="all">All Departments</SelectItem>
-                {departments.map((dept) => (
-                  <SelectItem key={dept} value={dept}>
-                    {dept}
-                  </SelectItem>
-                ))}
-              </SelectContent>
-            </Select>
-          </div>
-        </div>
+        <Tabs defaultValue="users" className="space-y-6">
+          <TabsList>
+            <TabsTrigger value="users" className="gap-2">
+              <Shield className="h-4 w-4" />
+              Users
+            </TabsTrigger>
+            <TabsTrigger value="audit" className="gap-2">
+              <ScrollText className="h-4 w-4" />
+              Audit Log
+            </TabsTrigger>
+          </TabsList>
 
-        {/* Users Table */}
-        <div className="rounded-xl border border-border bg-card overflow-hidden">
-          {profilesLoading ? (
-            <div className="flex items-center justify-center py-12">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          {/* Users Tab */}
+          <TabsContent value="users">
+            {/* Search and Filter */}
+            <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center">
+              <div className="relative flex-1 max-w-md">
+                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                  placeholder="Search users..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  className="pl-10"
+                />
+              </div>
+              <div className="flex items-center gap-2">
+                <Filter className="h-4 w-4 text-muted-foreground" />
+                <Select value={departmentFilter} onValueChange={setDepartmentFilter}>
+                  <SelectTrigger className="w-[180px]">
+                    <SelectValue placeholder="All Departments" />
+                  </SelectTrigger>
+                  <SelectContent>
+                    <SelectItem value="all">All Departments</SelectItem>
+                    {departments.map((dept) => (
+                      <SelectItem key={dept} value={dept}>
+                        {dept}
+                      </SelectItem>
+                    ))}
+                  </SelectContent>
+                </Select>
+              </div>
             </div>
-          ) : (
-            <table className="w-full">
-              <thead>
-                <tr className="border-b border-border bg-muted/50">
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    User
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Department
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Role
-                  </th>
-                  <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Assigned Apps
-                  </th>
-                  <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Actions
-                  </th>
-                </tr>
-              </thead>
-              <tbody className="divide-y divide-border">
-                {filteredProfiles.map((profile) => (
-                  <tr key={profile.id} className="transition-colors hover:bg-muted/50">
-                    <td className="px-6 py-4">
-                      <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full gradient-primary text-sm font-medium text-primary-foreground">
-                          {profile.full_name
-                            ?.split(' ')
-                            .map((n) => n[0])
-                            .join('') || profile.email[0].toUpperCase()}
-                        </div>
-                        <div>
-                          <p className="font-medium text-card-foreground">
-                            {profile.full_name || 'No name'}
-                          </p>
-                          <p className="text-sm text-muted-foreground">{profile.email}</p>
-                        </div>
-                      </div>
-                    </td>
-                    <td className="px-6 py-4">
-                      <span className="text-card-foreground">
-                        {profile.department || '-'}
-                      </span>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge 
-                        variant={getUserRole(profile.id) === 'admin' ? 'default' : 'secondary'}
-                        className="capitalize gap-1"
-                      >
-                        {getUserRole(profile.id) === 'admin' && <Shield className="h-3 w-3" />}
-                        {getUserRole(profile.id)}
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4">
-                      <Badge variant="outline">
-                        {getUserAppCount(profile.id)} apps
-                      </Badge>
-                    </td>
-                    <td className="px-6 py-4 text-right">
-                      <DropdownMenu>
-                        <DropdownMenuTrigger asChild>
-                          <Button variant="ghost" size="sm">
-                            <Settings2 className="h-4 w-4" />
-                          </Button>
-                        </DropdownMenuTrigger>
-                        <DropdownMenuContent align="end">
-                          <DropdownMenuItem onClick={() => handleEditApps(profile.id)}>
-                            <Edit2 className="mr-2 h-4 w-4" />
-                            Edit App Access
-                          </DropdownMenuItem>
-                          <DropdownMenuItem onClick={() => openResetPasswordDialog(profile)}>
-                            <KeyRound className="mr-2 h-4 w-4" />
-                            Reset Password
-                          </DropdownMenuItem>
-                        </DropdownMenuContent>
-                      </DropdownMenu>
-                    </td>
-                  </tr>
-                ))}
-                {filteredProfiles.length === 0 && (
-                  <tr>
-                    <td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">
-                      No users found
-                    </td>
-                  </tr>
+
+            {/* Users Table */}
+            <div className="rounded-xl border border-border bg-card overflow-hidden">
+              {profilesLoading ? (
+                <div className="flex items-center justify-center py-12">
+                  <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                </div>
+              ) : (
+                <table className="w-full">
+                  <thead>
+                    <tr className="border-b border-border bg-muted/50">
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">User</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Department</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Role</th>
+                      <th className="px-6 py-4 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground">Assigned Apps</th>
+                      <th className="px-6 py-4 text-right text-xs font-semibold uppercase tracking-wider text-muted-foreground">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border">
+                    {filteredProfiles.map((profile) => (
+                      <tr key={profile.id} className="transition-colors hover:bg-muted/50">
+                        <td className="px-6 py-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full gradient-primary text-sm font-medium text-primary-foreground">
+                              {profile.full_name?.split(' ').map((n) => n[0]).join('') || profile.email[0].toUpperCase()}
+                            </div>
+                            <div>
+                              <p className="font-medium text-card-foreground">{profile.full_name || 'No name'}</p>
+                              <p className="text-sm text-muted-foreground">{profile.email}</p>
+                            </div>
+                          </div>
+                        </td>
+                        <td className="px-6 py-4"><span className="text-card-foreground">{profile.department || '-'}</span></td>
+                        <td className="px-6 py-4">
+                          <Badge variant={getUserRole(profile.id) === 'admin' ? 'default' : 'secondary'} className="capitalize gap-1">
+                            {getUserRole(profile.id) === 'admin' && <Shield className="h-3 w-3" />}
+                            {getUserRole(profile.id)}
+                          </Badge>
+                        </td>
+                        <td className="px-6 py-4"><Badge variant="outline">{getUserAppCount(profile.id)} apps</Badge></td>
+                        <td className="px-6 py-4 text-right">
+                          <DropdownMenu>
+                            <DropdownMenuTrigger asChild>
+                              <Button variant="ghost" size="sm"><Settings2 className="h-4 w-4" /></Button>
+                            </DropdownMenuTrigger>
+                            <DropdownMenuContent align="end">
+                              <DropdownMenuItem onClick={() => handleEditApps(profile.id)}>
+                                <Edit2 className="mr-2 h-4 w-4" />Edit App Access
+                              </DropdownMenuItem>
+                              <DropdownMenuItem onClick={() => openResetPasswordDialog(profile)}>
+                                <KeyRound className="mr-2 h-4 w-4" />Reset Password
+                              </DropdownMenuItem>
+                            </DropdownMenuContent>
+                          </DropdownMenu>
+                        </td>
+                      </tr>
+                    ))}
+                    {filteredProfiles.length === 0 && (
+                      <tr><td colSpan={5} className="px-6 py-12 text-center text-muted-foreground">No users found</td></tr>
+                    )}
+                  </tbody>
+                </table>
+              )}
+            </div>
+          </TabsContent>
+
+          {/* Audit Log Tab */}
+          <TabsContent value="audit">
+            <Card>
+              <CardHeader className="flex flex-row items-center justify-between">
+                <CardTitle className="flex items-center gap-2">
+                  <ScrollText className="h-5 w-5" />
+                  Activity Audit Log
+                </CardTitle>
+                <div className="relative w-64">
+                  <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                  <Input
+                    placeholder="Search audit log..."
+                    value={auditSearchQuery}
+                    onChange={(e) => setAuditSearchQuery(e.target.value)}
+                    className="pl-10"
+                  />
+                </div>
+              </CardHeader>
+              <CardContent>
+                {auditLoading ? (
+                  <div className="flex items-center justify-center py-12">
+                    <Loader2 className="h-8 w-8 animate-spin text-primary" />
+                  </div>
+                ) : filteredAuditLog.length === 0 ? (
+                  <p className="text-center text-muted-foreground py-12">No audit log entries found.</p>
+                ) : (
+                  <Table>
+                    <TableHeader>
+                      <TableRow>
+                        <TableHead>Time</TableHead>
+                        <TableHead>User</TableHead>
+                        <TableHead>Action</TableHead>
+                        <TableHead>Module</TableHead>
+                        <TableHead>Record</TableHead>
+                      </TableRow>
+                    </TableHeader>
+                    <TableBody>
+                      {filteredAuditLog.map((entry) => (
+                        <TableRow key={entry.id}>
+                          <TableCell className="text-xs text-muted-foreground whitespace-nowrap">
+                            {formatDistanceToNow(new Date(entry.created_at), { addSuffix: true })}
+                          </TableCell>
+                          <TableCell className="font-medium">
+                            {entry.user_id ? profileMap[entry.user_id] || 'Unknown' : 'System'}
+                          </TableCell>
+                          <TableCell>
+                            <Badge variant={getActionColor(entry.action) as any} className="capitalize">
+                              {entry.action}
+                            </Badge>
+                          </TableCell>
+                          <TableCell className="capitalize">{entry.table_name.replace(/_/g, ' ')}</TableCell>
+                          <TableCell className="text-sm text-muted-foreground max-w-[200px] truncate">
+                            {entry.record_summary || entry.record_id || '-'}
+                          </TableCell>
+                        </TableRow>
+                      ))}
+                    </TableBody>
+                  </Table>
                 )}
-              </tbody>
-            </table>
-          )}
-        </div>
+              </CardContent>
+            </Card>
+          </TabsContent>
+        </Tabs>
 
         {/* Edit Apps Dialog */}
         <Dialog open={isEditAppsDialogOpen} onOpenChange={setIsEditAppsDialogOpen}>
           <DialogContent className="sm:max-w-md">
             <DialogHeader>
-              <DialogTitle className="font-display">
-                Edit App Access
-              </DialogTitle>
+              <DialogTitle className="font-display">Edit App Access</DialogTitle>
             </DialogHeader>
             <div className="space-y-4 py-4 max-h-96 overflow-y-auto">
               {apps.map((app) => (
-                <div
-                  key={app.id}
-                  className="flex items-center justify-between rounded-lg border border-border p-4"
-                >
+                <div key={app.id} className="flex items-center justify-between rounded-lg border border-border p-4">
                   <div className="flex items-center gap-3">
-                    <Checkbox
-                      id={app.id}
-                      checked={userApps.includes(app.id)}
-                      onCheckedChange={() => handleToggleApp(app.id)}
-                    />
+                    <Checkbox id={app.id} checked={userApps.includes(app.id)} onCheckedChange={() => handleToggleApp(app.id)} />
                     <div>
-                      <label
-                        htmlFor={app.id}
-                        className="font-medium text-foreground cursor-pointer"
-                      >
-                        {app.name}
-                      </label>
-                      {app.description && (
-                        <p className="text-sm text-muted-foreground">
-                          {app.description}
-                        </p>
-                      )}
+                      <label htmlFor={app.id} className="font-medium text-foreground cursor-pointer">{app.name}</label>
+                      {app.description && <p className="text-sm text-muted-foreground">{app.description}</p>}
                     </div>
                   </div>
                 </div>
               ))}
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsEditAppsDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                variant="gradient" 
-                onClick={handleSaveApps}
-                disabled={updateAppsMutation.isPending}
-              >
+              <Button variant="outline" onClick={() => setIsEditAppsDialogOpen(false)}>Cancel</Button>
+              <Button variant="gradient" onClick={handleSaveApps} disabled={updateAppsMutation.isPending}>
                 {updateAppsMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Save Changes
               </Button>
@@ -659,42 +713,18 @@ export default function Admin() {
               </p>
               <div className="space-y-2">
                 <Label htmlFor="new-password">New Password</Label>
-                <Input
-                  id="new-password"
-                  type="password"
-                  value={resetPasswordForm.new_password}
-                  onChange={(e) => setResetPasswordForm(prev => ({ ...prev, new_password: e.target.value }))}
-                  placeholder="Minimum 6 characters"
-                  maxLength={72}
-                />
-                {resetPasswordErrors.new_password && (
-                  <p className="text-xs text-destructive">{resetPasswordErrors.new_password}</p>
-                )}
+                <Input id="new-password" type="password" value={resetPasswordForm.new_password} onChange={(e) => setResetPasswordForm(prev => ({ ...prev, new_password: e.target.value }))} placeholder="Minimum 6 characters" maxLength={72} />
+                {resetPasswordErrors.new_password && <p className="text-xs text-destructive">{resetPasswordErrors.new_password}</p>}
               </div>
               <div className="space-y-2">
                 <Label htmlFor="confirm-password">Confirm Password</Label>
-                <Input
-                  id="confirm-password"
-                  type="password"
-                  value={resetPasswordForm.confirm_password}
-                  onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))}
-                  placeholder="Re-enter password"
-                  maxLength={72}
-                />
-                {resetPasswordErrors.confirm_password && (
-                  <p className="text-xs text-destructive">{resetPasswordErrors.confirm_password}</p>
-                )}
+                <Input id="confirm-password" type="password" value={resetPasswordForm.confirm_password} onChange={(e) => setResetPasswordForm(prev => ({ ...prev, confirm_password: e.target.value }))} placeholder="Re-enter password" maxLength={72} />
+                {resetPasswordErrors.confirm_password && <p className="text-xs text-destructive">{resetPasswordErrors.confirm_password}</p>}
               </div>
             </div>
             <div className="flex justify-end gap-2">
-              <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>
-                Cancel
-              </Button>
-              <Button 
-                variant="gradient" 
-                onClick={handleResetPassword}
-                disabled={resetPasswordMutation.isPending}
-              >
+              <Button variant="outline" onClick={() => setIsResetPasswordDialogOpen(false)}>Cancel</Button>
+              <Button variant="gradient" onClick={handleResetPassword} disabled={resetPasswordMutation.isPending}>
                 {resetPasswordMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                 Reset Password
               </Button>
