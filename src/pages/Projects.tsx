@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { Plus, Loader2, FolderKanban, Calendar, Trash2 } from 'lucide-react';
+import { Plus, Loader2, FolderKanban, Calendar, Trash2, Pencil } from 'lucide-react';
 import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { motion } from 'framer-motion';
@@ -37,6 +37,8 @@ export default function Projects() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
   const [isDialogOpen, setIsDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingProject, setEditingProject] = useState<Project | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('planning');
@@ -65,9 +67,29 @@ export default function Projects() {
       queryClient.invalidateQueries({ queryKey: ['projects'] });
       toast.success('Project created successfully');
       setIsDialogOpen(false);
-      setName(''); setDescription(''); setStatus('planning'); setStartDate(undefined);
+      resetForm();
     },
     onError: (error: Error) => toast.error('Failed to create project: ' + error.message),
+  });
+
+  const editProjectMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingProject) return;
+      const { error } = await supabase.from('projects').update({
+        name, description: description || null, status,
+        start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
+      }).eq('id', editingProject.id);
+      if (error) throw error;
+      await logAuditAction({ userId: user?.id!, action: 'update', tableName: 'projects', recordId: editingProject.id, recordSummary: name });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['projects'] });
+      toast.success('Project updated');
+      setIsEditDialogOpen(false);
+      setEditingProject(null);
+      resetForm();
+    },
+    onError: (error: Error) => toast.error('Failed to update project: ' + error.message),
   });
 
   const updateProgressMutation = useMutation({
@@ -93,11 +115,41 @@ export default function Projects() {
     onSuccess: () => { queryClient.invalidateQueries({ queryKey: ['projects'] }); toast.success('Project deleted'); },
   });
 
+  const resetForm = () => { setName(''); setDescription(''); setStatus('planning'); setStartDate(undefined); };
+
+  const openEditDialog = (project: Project) => {
+    setEditingProject(project);
+    setName(project.name);
+    setDescription(project.description || '');
+    setStatus(project.status);
+    setStartDate(project.start_date ? new Date(project.start_date) : undefined);
+    setIsEditDialogOpen(true);
+  };
+
   const statusCounts = projects.reduce((acc, p) => { acc[p.status] = (acc[p.status] || 0) + 1; return acc; }, {} as Record<string, number>);
 
   if (isLoading) {
     return (<MainLayout><div className="flex h-[50vh] items-center justify-center"><Loader2 className="h-8 w-8 animate-spin text-primary" /></div></MainLayout>);
   }
+
+  const projectFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2"><Label>Project Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Cloud Migration" /></div>
+      <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Project description..." rows={3} /></div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2"><Label>Status</Label>
+          <Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent><SelectItem value="planning">Planning</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="on-hold">On Hold</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2"><Label>Start Date</Label><DatePicker date={startDate} onDateChange={setStartDate} placeholder="Select start date" /></div>
+      </div>
+      <Button className="w-full" onClick={() => isEdit ? editProjectMutation.mutate() : createProjectMutation.mutate()} disabled={!name || (isEdit ? editProjectMutation.isPending : createProjectMutation.isPending)}>
+        {(isEdit ? editProjectMutation.isPending : createProjectMutation.isPending) && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+        {isEdit ? 'Save Changes' : 'Create Project'}
+      </Button>
+    </div>
+  );
 
   return (
     <MainLayout>
@@ -108,24 +160,18 @@ export default function Projects() {
             <DialogTrigger asChild><Button variant="gradient" className="gap-2"><Plus className="h-4 w-4" />New Project</Button></DialogTrigger>
             <DialogContent>
               <DialogHeader><DialogTitle>Create New Project</DialogTitle></DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2"><Label>Project Name *</Label><Input value={name} onChange={(e) => setName(e.target.value)} placeholder="Cloud Migration" /></div>
-                <div className="space-y-2"><Label>Description</Label><Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Project description..." rows={3} /></div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2"><Label>Status</Label>
-                    <Select value={status} onValueChange={setStatus}><SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent><SelectItem value="planning">Planning</SelectItem><SelectItem value="active">Active</SelectItem><SelectItem value="on-hold">On Hold</SelectItem><SelectItem value="completed">Completed</SelectItem></SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2"><Label>Start Date</Label><DatePicker date={startDate} onDateChange={setStartDate} placeholder="Select start date" /></div>
-                </div>
-                <Button className="w-full" onClick={() => createProjectMutation.mutate()} disabled={!name || createProjectMutation.isPending}>
-                  {createProjectMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Project
-                </Button>
-              </div>
+              {projectFormContent(false)}
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setEditingProject(null); resetForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Project</DialogTitle></DialogHeader>
+            {projectFormContent(true)}
+          </DialogContent>
+        </Dialog>
 
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           {[
@@ -149,8 +195,10 @@ export default function Projects() {
           <motion.div variants={containerVariants} initial="hidden" animate="show" className="grid gap-5 md:grid-cols-2 lg:grid-cols-3">
             {projects.map((project) => (
               <motion.div key={project.id} variants={itemVariants} className="group rounded-2xl border border-border bg-card p-6 transition-all duration-300 hover:border-primary/30 hover:shadow-lg card-interactive relative">
-                <Button size="icon" variant="ghost" className="absolute top-3 right-3 h-7 w-7 opacity-0 group-hover:opacity-100 transition-opacity text-destructive hover:text-destructive"
-                  onClick={() => deleteProjectMutation.mutate(project)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                <div className="absolute top-3 right-3 flex gap-1 opacity-0 group-hover:opacity-100 transition-opacity">
+                  <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => openEditDialog(project)}><Pencil className="h-3.5 w-3.5" /></Button>
+                  <Button size="icon" variant="ghost" className="h-7 w-7 text-destructive hover:text-destructive" onClick={() => deleteProjectMutation.mutate(project)}><Trash2 className="h-3.5 w-3.5" /></Button>
+                </div>
                 <div className="flex items-start justify-between">
                   <Badge variant="outline" className={cn('capitalize text-xs', statusColors[project.status])}>{project.status.replace('-', ' ')}</Badge>
                   {project.start_date && (<span className="flex items-center gap-1 text-xs text-muted-foreground"><Calendar className="h-3 w-3" />{new Date(project.start_date).toLocaleDateString()}</span>)}

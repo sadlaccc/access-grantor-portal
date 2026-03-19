@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Loader2, Ticket, AlertCircle } from 'lucide-react';
+import { Plus, Search, Loader2, Ticket, AlertCircle, Pencil } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -65,6 +65,8 @@ export default function Helpdesk() {
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
   const [isCreateDialogOpen, setIsCreateDialogOpen] = useState(false);
+  const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
+  const [editingTicket, setEditingTicket] = useState<TicketType | null>(null);
 
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
@@ -162,6 +164,24 @@ export default function Helpdesk() {
     },
   });
 
+  const editTicketMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingTicket) return;
+      const { error } = await supabase.from('tickets').update({
+        title, description: description || null, priority, assignee_id: assigneeId,
+      }).eq('id', editingTicket.id);
+      if (error) throw error;
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success('Ticket updated');
+      setIsEditDialogOpen(false);
+      setEditingTicket(null);
+      resetForm();
+    },
+    onError: (error: Error) => toast.error('Failed to update ticket: ' + error.message),
+  });
+
   const updateTicketStatusMutation = useMutation({
     mutationFn: async ({ ticketId, status, oldStatus }: { ticketId: string; status: string; oldStatus: string }) => {
       const { data, error } = await supabase
@@ -201,6 +221,15 @@ export default function Helpdesk() {
     setAssigneeId(null);
   };
 
+  const openEditDialog = (ticket: TicketType) => {
+    setEditingTicket(ticket);
+    setTitle(ticket.title);
+    setDescription(ticket.description || '');
+    setPriority(ticket.priority);
+    setAssigneeId(ticket.assignee_id);
+    setIsEditDialogOpen(true);
+  };
+
   const filteredTickets = tickets.filter((ticket) => {
     const matchesSearch =
       ticket.title.toLowerCase().includes(searchQuery.toLowerCase()) ||
@@ -224,6 +253,48 @@ export default function Helpdesk() {
     );
   }
 
+  const ticketFormContent = (isEdit: boolean) => (
+    <div className="space-y-4">
+      <div className="space-y-2">
+        <Label>Title *</Label>
+        <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Brief description of the issue" />
+      </div>
+      <div className="space-y-2">
+        <Label>Description</Label>
+        <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detailed description..." rows={4} />
+      </div>
+      <div className="grid grid-cols-2 gap-4">
+        <div className="space-y-2">
+          <Label>Priority</Label>
+          <Select value={priority} onValueChange={setPriority}>
+            <SelectTrigger><SelectValue /></SelectTrigger>
+            <SelectContent>
+              <SelectItem value="low">Low</SelectItem>
+              <SelectItem value="medium">Medium</SelectItem>
+              <SelectItem value="high">High</SelectItem>
+              <SelectItem value="critical">Critical</SelectItem>
+            </SelectContent>
+          </Select>
+        </div>
+        <div className="space-y-2">
+          <Label>Assign To</Label>
+          <Select value={assigneeId || ''} onValueChange={(v) => setAssigneeId(v || null)}>
+            <SelectTrigger><SelectValue placeholder="Select assignee" /></SelectTrigger>
+            <SelectContent>
+              {profiles.map((profile) => (
+                <SelectItem key={profile.id} value={profile.id}>{profile.full_name || profile.email}</SelectItem>
+              ))}
+            </SelectContent>
+          </Select>
+        </div>
+      </div>
+      <Button className="w-full" onClick={() => isEdit ? editTicketMutation.mutate() : createTicketMutation.mutate()} disabled={!title || (isEdit ? editTicketMutation.isPending : createTicketMutation.isPending)}>
+        {(isEdit ? editTicketMutation.isPending : createTicketMutation.isPending) && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
+        {isEdit ? 'Save Changes' : 'Create Ticket'}
+      </Button>
+    </div>
+  );
+
   return (
     <MainLayout>
       <div className="p-6 lg:p-8 space-y-6">
@@ -244,48 +315,18 @@ export default function Helpdesk() {
               <DialogHeader>
                 <DialogTitle>Create New Ticket</DialogTitle>
               </DialogHeader>
-              <div className="space-y-4">
-                <div className="space-y-2">
-                  <Label>Title *</Label>
-                  <Input value={title} onChange={(e) => setTitle(e.target.value)} placeholder="Brief description of the issue" />
-                </div>
-                <div className="space-y-2">
-                  <Label>Description</Label>
-                  <Textarea value={description} onChange={(e) => setDescription(e.target.value)} placeholder="Detailed description..." rows={4} />
-                </div>
-                <div className="grid grid-cols-2 gap-4">
-                  <div className="space-y-2">
-                    <Label>Priority</Label>
-                    <Select value={priority} onValueChange={setPriority}>
-                      <SelectTrigger><SelectValue /></SelectTrigger>
-                      <SelectContent>
-                        <SelectItem value="low">Low</SelectItem>
-                        <SelectItem value="medium">Medium</SelectItem>
-                        <SelectItem value="high">High</SelectItem>
-                        <SelectItem value="critical">Critical</SelectItem>
-                      </SelectContent>
-                    </Select>
-                  </div>
-                  <div className="space-y-2">
-                    <Label>Assign To</Label>
-                    <Select value={assigneeId || ''} onValueChange={(v) => setAssigneeId(v || null)}>
-                      <SelectTrigger><SelectValue placeholder="Select assignee" /></SelectTrigger>
-                      <SelectContent>
-                        {profiles.map((profile) => (
-                          <SelectItem key={profile.id} value={profile.id}>{profile.full_name || profile.email}</SelectItem>
-                        ))}
-                      </SelectContent>
-                    </Select>
-                  </div>
-                </div>
-                <Button className="w-full" onClick={() => createTicketMutation.mutate()} disabled={!title || createTicketMutation.isPending}>
-                  {createTicketMutation.isPending && <Loader2 className="h-4 w-4 animate-spin mr-2" />}
-                  Create Ticket
-                </Button>
-              </div>
+              {ticketFormContent(false)}
             </DialogContent>
           </Dialog>
         </div>
+
+        {/* Edit Dialog */}
+        <Dialog open={isEditDialogOpen} onOpenChange={(open) => { setIsEditDialogOpen(open); if (!open) { setEditingTicket(null); resetForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Ticket</DialogTitle></DialogHeader>
+            {ticketFormContent(true)}
+          </DialogContent>
+        </Dialog>
 
         {/* Stats */}
         <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -358,7 +399,7 @@ export default function Helpdesk() {
                   </td>
                 </tr>
               ) : (
-                filteredTickets.map((ticket, idx) => (
+                filteredTickets.map((ticket) => (
                   <motion.tr key={ticket.id} variants={rowVariants} className="transition-colors hover:bg-muted/30">
                     <td className="px-6 py-4">
                       <div className="flex items-center gap-3">
@@ -389,20 +430,25 @@ export default function Helpdesk() {
                       <span className="text-sm text-card-foreground">{ticket.assignee_id ? profileMap[ticket.assignee_id] || 'Unknown' : '—'}</span>
                     </td>
                     <td className="px-6 py-4">
-                      <Select
-                        value={ticket.status}
-                        onValueChange={(newStatus) => updateTicketStatusMutation.mutate({ ticketId: ticket.id, status: newStatus, oldStatus: ticket.status })}
-                      >
-                        <SelectTrigger className="w-[130px] rounded-lg">
-                          <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                          <SelectItem value="open">Open</SelectItem>
-                          <SelectItem value="in-progress">In Progress</SelectItem>
-                          <SelectItem value="resolved">Resolved</SelectItem>
-                          <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                      </Select>
+                      <div className="flex items-center gap-2">
+                        <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(ticket)}>
+                          <Pencil className="h-3.5 w-3.5" />
+                        </Button>
+                        <Select
+                          value={ticket.status}
+                          onValueChange={(newStatus) => updateTicketStatusMutation.mutate({ ticketId: ticket.id, status: newStatus, oldStatus: ticket.status })}
+                        >
+                          <SelectTrigger className="w-[130px] rounded-lg">
+                            <SelectValue />
+                          </SelectTrigger>
+                          <SelectContent>
+                            <SelectItem value="open">Open</SelectItem>
+                            <SelectItem value="in-progress">In Progress</SelectItem>
+                            <SelectItem value="resolved">Resolved</SelectItem>
+                            <SelectItem value="closed">Closed</SelectItem>
+                          </SelectContent>
+                        </Select>
+                      </div>
                     </td>
                   </motion.tr>
                 ))
