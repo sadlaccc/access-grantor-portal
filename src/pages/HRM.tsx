@@ -147,11 +147,11 @@ export default function HRM() {
   // Mutations
   const createLeaveMutation = useMutation({
     mutationFn: async () => {
-      const start = new Date(leaveStart);
-      const end = new Date(leaveEnd);
-      const days = Math.ceil((end.getTime() - start.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (!leaveStart || !leaveEnd) throw new Error('Dates required');
+      const days = Math.ceil((leaveEnd.getTime() - leaveStart.getTime()) / (1000 * 60 * 60 * 24)) + 1;
+      if (days <= 0) throw new Error('End date must be after start date');
       const { error } = await supabase.from('leave_requests').insert({
-        user_id: user?.id!, leave_type: leaveType, start_date: leaveStart, end_date: leaveEnd, days, reason: leaveReason || null,
+        user_id: user?.id!, leave_type: leaveType, start_date: format(leaveStart, 'yyyy-MM-dd'), end_date: format(leaveEnd, 'yyyy-MM-dd'), days, reason: leaveReason || null,
       });
       if (error) throw error;
     },
@@ -159,7 +159,7 @@ export default function HRM() {
       queryClient.invalidateQueries({ queryKey: ['leave-requests'] });
       toast.success('Leave request submitted');
       setIsLeaveDialogOpen(false);
-      setLeaveType('annual'); setLeaveStart(''); setLeaveEnd(''); setLeaveReason('');
+      setLeaveType('annual'); setLeaveStart(undefined); setLeaveEnd(undefined); setLeaveReason('');
     },
     onError: (e: Error) => toast.error(e.message),
   });
