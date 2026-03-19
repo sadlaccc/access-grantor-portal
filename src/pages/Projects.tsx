@@ -72,7 +72,7 @@ export default function Projects() {
         name,
         description: description || null,
         status,
-        start_date: startDate || null,
+        start_date: startDate ? format(startDate, 'yyyy-MM-dd') : null,
         created_by: user?.id,
       });
       if (error) throw error;
