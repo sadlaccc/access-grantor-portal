@@ -77,6 +77,17 @@ interface UserAppAssignment {
   user_id: string;
 }
 
+interface AuditLogEntry {
+  id: string;
+  user_id: string | null;
+  action: string;
+  table_name: string;
+  record_id: string | null;
+  record_summary: string | null;
+  details: any;
+  created_at: string;
+}
+
 export default function Admin() {
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
