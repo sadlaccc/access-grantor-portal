@@ -162,7 +162,7 @@ export default function Projects() {
                   </div>
                   <div className="space-y-2">
                     <Label>Start Date</Label>
-                    <Input type="date" value={startDate} onChange={(e) => setStartDate(e.target.value)} />
+                    <DatePicker date={startDate} onDateChange={setStartDate} placeholder="Select start date" />
                   </div>
                 </div>
                 <Button className="w-full" onClick={() => createProjectMutation.mutate()} disabled={!name || createProjectMutation.isPending}>
