@@ -367,7 +367,7 @@ export default function Collaboration() {
                   )}
                   <p className="text-sm text-foreground/90 break-words">{msg.content}</p>
                 </div>
-                {isOwn && (
+                {(isOwn || isAdmin) && (
                   <button onClick={() => handleDeleteDm(msg.id)} className="opacity-0 group-hover:opacity-100 transition-opacity shrink-0 h-6 w-6 rounded flex items-center justify-center hover:bg-destructive/10">
                     <Trash2 className="h-3.5 w-3.5 text-destructive" />
                   </button>
