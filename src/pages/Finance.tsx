@@ -150,7 +150,7 @@ const Finance = () => {
           tax_rate: taxRate,
           tax_amount: taxAmount,
           total_amount: totalAmount,
-          due_date: invoiceDueDate,
+          due_date: invoiceDueDate ? format(invoiceDueDate, 'yyyy-MM-dd') : null,
           created_by: user?.id,
         })
         .select()
