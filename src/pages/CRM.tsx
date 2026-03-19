@@ -181,7 +181,7 @@ export default function CRM() {
                   <div className="space-y-2"><Label>Company *</Label><Input value={dealCompany} onChange={(e) => setDealCompany(e.target.value)} placeholder="Acme Corp" /></div>
                   <div className="grid grid-cols-2 gap-4">
                     <div className="space-y-2"><Label>Value (KES)</Label><Input type="number" value={dealValue} onChange={(e) => setDealValue(e.target.value)} placeholder="50000" /></div>
-                    <div className="space-y-2"><Label>Close Date</Label><Input type="date" value={dealCloseDate} onChange={(e) => setDealCloseDate(e.target.value)} /></div>
+                    <div className="space-y-2"><Label>Close Date</Label><DatePicker date={dealCloseDate} onDateChange={setDealCloseDate} placeholder="Select close date" /></div>
                   </div>
                   <Button className="w-full" onClick={() => createDealMutation.mutate()} disabled={!dealName || !dealCompany || createDealMutation.isPending}>
                     {createDealMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Deal
