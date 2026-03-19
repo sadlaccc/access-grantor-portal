@@ -178,7 +178,7 @@ export default function HRM() {
   const createTrainingMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('trainings').insert({
-        name: trainingName, description: trainingDesc || null, due_date: trainingDueDate || null, created_by: user?.id,
+        name: trainingName, description: trainingDesc || null, due_date: trainingDueDate ? format(trainingDueDate, 'yyyy-MM-dd') : null, created_by: user?.id,
       });
       if (error) throw error;
     },
@@ -186,7 +186,7 @@ export default function HRM() {
       queryClient.invalidateQueries({ queryKey: ['trainings'] });
       toast.success('Training created');
       setIsTrainingDialogOpen(false);
-      setTrainingName(''); setTrainingDesc(''); setTrainingDueDate('');
+      setTrainingName(''); setTrainingDesc(''); setTrainingDueDate(undefined);
     },
     onError: (e: Error) => toast.error(e.message),
   });
