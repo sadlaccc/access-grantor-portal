@@ -108,7 +108,31 @@ const Inventory = () => {
     },
   });
 
-  // Delete product mutation
+  // Edit product mutation
+  const editProductMutation = useMutation({
+    mutationFn: async () => {
+      if (!editingProduct) return;
+      const { error } = await supabase.from('inventory_products').update({
+        name: productName, sku: productSku, category: productCategory || null,
+        quantity_in_stock: parseInt(productQuantity) || 0, unit_price: parseFloat(productPrice) || 0,
+        reorder_level: parseInt(productReorderLevel) || 10,
+      }).eq('id', editingProduct.id);
+      if (error) throw error;
+      if (user) {
+        logAuditAction({ userId: user.id, action: 'update', tableName: 'inventory_products', recordId: editingProduct.id, recordSummary: productName });
+      }
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-products'] });
+      toast({ title: 'Product updated' });
+      setIsEditProductOpen(false);
+      setEditingProduct(null);
+      resetProductForm();
+    },
+    onError: (error: Error) => toast({ title: 'Failed to update product', description: error.message, variant: 'destructive' }),
+  });
+
+
   const deleteProductMutation = useMutation({
     mutationFn: async (product: Product) => {
       const { error } = await supabase.from('inventory_products').delete().eq('id', product.id);
