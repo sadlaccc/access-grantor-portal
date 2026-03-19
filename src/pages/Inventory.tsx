@@ -450,7 +450,27 @@ const Inventory = () => {
           </div>
         </div>
 
-        {/* Stats */}
+        {/* Edit Product Dialog */}
+        <Dialog open={isEditProductOpen} onOpenChange={(open) => { setIsEditProductOpen(open); if (!open) { setEditingProduct(null); resetProductForm(); } }}>
+          <DialogContent>
+            <DialogHeader><DialogTitle>Edit Product</DialogTitle></DialogHeader>
+            <div className="space-y-4">
+              <div className="grid grid-cols-2 gap-4">
+                <div className="space-y-2"><Label>Product Name</Label><Input value={productName} onChange={e => setProductName(e.target.value)} required /></div>
+                <div className="space-y-2"><Label>SKU</Label><Input value={productSku} onChange={e => setProductSku(e.target.value)} required /></div>
+              </div>
+              <div className="space-y-2"><Label>Category</Label><Input value={productCategory} onChange={e => setProductCategory(e.target.value)} /></div>
+              <div className="grid grid-cols-3 gap-4">
+                <div className="space-y-2"><Label>Quantity</Label><Input type="number" value={productQuantity} onChange={e => setProductQuantity(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Unit Price</Label><Input type="number" step="0.01" value={productPrice} onChange={e => setProductPrice(e.target.value)} /></div>
+                <div className="space-y-2"><Label>Reorder Level</Label><Input type="number" value={productReorderLevel} onChange={e => setProductReorderLevel(e.target.value)} /></div>
+              </div>
+              <Button onClick={() => editProductMutation.mutate()} className="w-full gradient-primary" disabled={!productName || editProductMutation.isPending}>
+                {editProductMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Save Changes
+              </Button>
+            </div>
+          </DialogContent>
+        </Dialog>
         <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
           <Card>
             <CardContent className="pt-6">
