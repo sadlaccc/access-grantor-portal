@@ -182,6 +182,16 @@ export default function Collaboration() {
     toast.success('Channel deleted');
   };
 
+  const handleRenameChannel = async (channelId: string) => {
+    if (!editChannelName.trim()) { toast.error('Enter a name'); return; }
+    const { error } = await supabase.from('chat_channels').update({ name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') }).eq('id', channelId);
+    if (error) { toast.error('Failed to rename channel'); return; }
+    setChannels(prev => prev.map(c => c.id === channelId ? { ...c, name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') } : c));
+    if (selectedChannel?.id === channelId) setSelectedChannel(prev => prev ? { ...prev, name: editChannelName.trim().toLowerCase().replace(/\s+/g, '-') } : prev);
+    setEditingChannelId(null);
+    toast.success('Channel renamed');
+  };
+
   const getInitials = (name: string | null | undefined) => {
     if (!name) return '??';
     return name.split(' ').map(n => n[0]).join('').toUpperCase().slice(0, 2);
