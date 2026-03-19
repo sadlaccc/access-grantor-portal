@@ -562,7 +562,7 @@ export default function HRM() {
                       <div className="space-y-4">
                         <div className="space-y-2"><Label>Training Name *</Label><Input value={trainingName} onChange={(e) => setTrainingName(e.target.value)} placeholder="Cybersecurity Basics" /></div>
                         <div className="space-y-2"><Label>Description</Label><Textarea value={trainingDesc} onChange={(e) => setTrainingDesc(e.target.value)} placeholder="Describe the training..." rows={3} /></div>
-                        <div className="space-y-2"><Label>Due Date</Label><Input type="date" value={trainingDueDate} onChange={(e) => setTrainingDueDate(e.target.value)} /></div>
+                        <div className="space-y-2"><Label>Due Date</Label><DatePicker date={trainingDueDate} onDateChange={setTrainingDueDate} placeholder="Select due date" /></div>
                         <Button className="w-full" onClick={() => createTrainingMutation.mutate()} disabled={!trainingName || createTrainingMutation.isPending}>
                           {createTrainingMutation.isPending && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}Create Training
                         </Button>
