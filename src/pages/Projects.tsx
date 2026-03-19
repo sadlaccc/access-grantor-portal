@@ -84,7 +84,7 @@ export default function Projects() {
       setName('');
       setDescription('');
       setStatus('planning');
-      setStartDate('');
+      setStartDate(undefined);
     },
     onError: (error: Error) => {
       toast.error('Failed to create project: ' + error.message);
