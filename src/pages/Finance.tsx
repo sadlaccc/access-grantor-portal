@@ -69,7 +69,7 @@ const Finance = () => {
   // Invoice form state
   const [invoiceClient, setInvoiceClient] = useState('');
   const [invoiceEmail, setInvoiceEmail] = useState('');
-  const [invoiceDueDate, setInvoiceDueDate] = useState('');
+  const [invoiceDueDate, setInvoiceDueDate] = useState<Date | undefined>();
   const [invoiceItems, setInvoiceItems] = useState<{ description: string; quantity: number; price: number }[]>([
     { description: '', quantity: 1, price: 0 }
   ]);

@@ -52,7 +52,7 @@ export default function Projects() {
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('planning');
-  const [startDate, setStartDate] = useState('');
+  const [startDate, setStartDate] = useState<Date | undefined>();
 
   const { data: projects = [], isLoading } = useQuery({
     queryKey: ['projects'],

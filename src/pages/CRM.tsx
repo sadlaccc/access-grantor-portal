@@ -68,7 +68,7 @@ export default function CRM() {
   const [dealName, setDealName] = useState('');
   const [dealCompany, setDealCompany] = useState('');
   const [dealValue, setDealValue] = useState('');
-  const [dealCloseDate, setDealCloseDate] = useState('');
+  const [dealCloseDate, setDealCloseDate] = useState<Date | undefined>();
 
   const { data: leads = [], isLoading: leadsLoading } = useQuery({
     queryKey: ['crm-leads'],
