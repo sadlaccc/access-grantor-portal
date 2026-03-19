@@ -1,4 +1,6 @@
 import { useState } from 'react';
+import { format } from 'date-fns';
+import { DatePicker } from '@/components/ui/date-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
