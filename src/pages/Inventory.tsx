@@ -1,6 +1,7 @@
 import { useState } from 'react';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2, Trash2, Pencil } from 'lucide-react';
+import { Package, Plus, Search, AlertTriangle, TrendingUp, TrendingDown, ShoppingCart, Loader2, Trash2, Pencil, RefreshCw } from 'lucide-react';
+import { useDepartment } from '@/hooks/useDepartment';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
