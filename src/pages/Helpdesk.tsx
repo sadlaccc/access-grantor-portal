@@ -471,6 +471,11 @@ export default function Helpdesk() {
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(ticket)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                        {(isIT || isAdmin) && ticket.priority !== 'critical' && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-warning" title="Escalate priority" onClick={() => escalateTicketMutation.mutate(ticket)} disabled={escalateTicketMutation.isPending}>
+                            <Zap className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Select
                           value={ticket.status}
                           onValueChange={(newStatus) => updateTicketStatusMutation.mutate({ ticketId: ticket.id, status: newStatus, oldStatus: ticket.status })}
