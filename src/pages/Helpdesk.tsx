@@ -216,6 +216,29 @@ export default function Helpdesk() {
     },
   });
 
+  const escalateTicketMutation = useMutation({
+    mutationFn: async (ticket: TicketType) => {
+      const next = ticket.priority === 'low' ? 'medium' : ticket.priority === 'medium' ? 'high' : 'critical';
+      const { error } = await supabase.from('tickets').update({ priority: next }).eq('id', ticket.id);
+      if (error) throw error;
+      return { ...ticket, next };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success(`Escalated to ${data.next}`);
+    },
+    onError: (e: Error) => toast.error('Escalate failed: ' + e.message),
+  });
+
+  const slaHours: Record<string, number> = { critical: 4, high: 8, medium: 24, low: 72 };
+  const getSla = (ticket: TicketType) => {
+    if (ticket.status === 'resolved' || ticket.status === 'closed') return null;
+    const target = slaHours[ticket.priority] ?? 24;
+    const elapsedH = (Date.now() - new Date(ticket.created_at).getTime()) / 3_600_000;
+    const remaining = target - elapsedH;
+    return { remaining, breached: remaining < 0 };
+  };
+
   const resetForm = () => {
     setTitle('');
     setDescription('');
