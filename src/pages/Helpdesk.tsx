@@ -62,6 +62,7 @@ const rowVariants = {
 
 export default function Helpdesk() {
   const { user } = useAuth();
+  const { isIT, isAdmin } = useDepartment();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
