@@ -20,6 +20,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
+import { useDepartment } from '@/hooks/useDepartment';
+import { ArrowRightLeft } from 'lucide-react';
 
 interface Lead {
   id: string; company: string; contact_name: string; email: string | null; phone: string | null;
