@@ -156,6 +156,7 @@ export default function CRM() {
     onError: (e: Error) => toast.error('Convert failed: ' + e.message),
   });
 
+  const createDealMutation = useMutation({
     mutationFn: async () => {
       const { error } = await supabase.from('crm_deals').insert({
         name: dealName, company: dealCompany, value: parseFloat(dealValue) || 0,
