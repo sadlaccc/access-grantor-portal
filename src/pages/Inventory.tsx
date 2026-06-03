@@ -230,6 +230,37 @@ const Inventory = () => {
     },
   });
 
+  // Quick reorder PO mutation (Ops/admin)
+  const reorderProductMutation = useMutation({
+    mutationFn: async (product: Product) => {
+      const shortage = Math.max(product.reorder_level * 2 - product.quantity_in_stock, product.reorder_level);
+      const orderNumber = `PO-${Date.now().toString(36).toUpperCase()}`;
+      const { data: order, error: oErr } = await supabase.from('inventory_orders').insert({
+        order_number: orderNumber,
+        vendor_customer: 'Auto-reorder',
+        order_type: 'purchase',
+        status: 'pending',
+        total_amount: (product.unit_price || 0) * shortage,
+        created_by: user?.id,
+      }).select().single();
+      if (oErr) throw oErr;
+      const { error: iErr } = await supabase.from('inventory_order_items').insert({
+        order_id: order.id, product_id: product.id, quantity: shortage, unit_price: product.unit_price || 0,
+      });
+      if (iErr) throw iErr;
+      return { orderNumber, product };
+    },
+    onSuccess: ({ orderNumber, product }) => {
+      queryClient.invalidateQueries({ queryKey: ['inventory-orders'] });
+      toast({ title: `Reorder PO ${orderNumber} created for ${product.name}` });
+      if (user) {
+        notifyAllUsers({ title: 'Reorder PO Created', message: `Auto-reorder for ${product.name}`, type: 'info', app: 'inventory', excludeUserId: user.id });
+        logAuditAction({ userId: user.id, action: 'create', tableName: 'inventory_orders', recordSummary: `Reorder ${product.name}` });
+      }
+    },
+    onError: (e: Error) => toast({ title: 'Reorder failed', description: e.message, variant: 'destructive' }),
+  });
+
   // Update order status mutation
   const updateOrderStatusMutation = useMutation({
     mutationFn: async ({ orderId, status }: { orderId: string; status: string }) => {
