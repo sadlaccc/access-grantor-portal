@@ -444,9 +444,21 @@ export default function Helpdesk() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[ticket.status])}>
-                        {ticket.status.replace('-', ' ')}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className={cn('capitalize text-xs w-fit', statusColors[ticket.status])}>
+                          {ticket.status.replace('-', ' ')}
+                        </Badge>
+                        {(() => {
+                          const sla = getSla(ticket);
+                          if (!sla) return null;
+                          return (
+                            <span className={cn('text-xs flex items-center gap-1', sla.breached ? 'text-destructive' : 'text-muted-foreground')}>
+                              <Clock className="h-3 w-3" />
+                              {sla.breached ? `SLA breached ${Math.abs(sla.remaining).toFixed(1)}h ago` : `${sla.remaining.toFixed(1)}h left`}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-card-foreground">{ticket.created_by ? profileMap[ticket.created_by] || 'Unknown' : '—'}</span>
