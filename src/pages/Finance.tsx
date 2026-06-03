@@ -64,6 +64,7 @@ interface Budget {
 
 const Finance = () => {
   const { user, isAdmin } = useAuth();
+  const { isFinance } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
