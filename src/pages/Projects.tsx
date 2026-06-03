@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Loader2, FolderKanban, Calendar, Trash2, Pencil } from 'lucide-react';
+import { Plus, Loader2, FolderKanban, Calendar, Trash2, Pencil, ListChecks } from 'lucide-react';
+import { ProjectFollowUp } from '@/components/projects/ProjectFollowUp';
 import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { motion } from 'framer-motion';
