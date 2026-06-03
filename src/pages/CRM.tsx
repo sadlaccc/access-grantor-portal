@@ -45,6 +45,7 @@ const cardVariants = {
 
 export default function CRM() {
   const { user } = useAuth();
+  const { isSales, isAdmin } = useDepartment();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
