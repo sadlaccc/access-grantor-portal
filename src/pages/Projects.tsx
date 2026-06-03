@@ -1,5 +1,6 @@
 import { useState } from 'react';
-import { Plus, Loader2, FolderKanban, Calendar, Trash2, Pencil } from 'lucide-react';
+import { Plus, Loader2, FolderKanban, Calendar, Trash2, Pencil, ListChecks } from 'lucide-react';
+import { ProjectFollowUp } from '@/components/projects/ProjectFollowUp';
 import { format } from 'date-fns';
 import { DatePicker } from '@/components/ui/date-picker';
 import { motion } from 'framer-motion';
@@ -39,6 +40,7 @@ export default function Projects() {
   const [isDialogOpen, setIsDialogOpen] = useState(false);
   const [isEditDialogOpen, setIsEditDialogOpen] = useState(false);
   const [editingProject, setEditingProject] = useState<Project | null>(null);
+  const [followUpProject, setFollowUpProject] = useState<Project | null>(null);
   const [name, setName] = useState('');
   const [description, setDescription] = useState('');
   const [status, setStatus] = useState('planning');
@@ -209,17 +211,19 @@ export default function Projects() {
                   <div className="flex items-center justify-between text-sm"><span className="text-muted-foreground">Progress</span><span className="font-semibold text-primary">{project.progress}%</span></div>
                   <div className="mt-2 h-2.5 overflow-hidden rounded-full bg-muted"><motion.div initial={{ width: 0 }} animate={{ width: `${project.progress}%` }} transition={{ duration: 0.8, ease: 'easeOut' }} className="h-full rounded-full gradient-primary" /></div>
                 </div>
-                <div className="mt-4 flex gap-2">
-                  {[25, 50, 75, 100].map((p) => (
-                    <Button key={p} variant={project.progress >= p ? 'default' : 'outline'} size="sm"
-                      className={cn('flex-1 text-xs transition-all', project.progress >= p && 'gradient-primary text-white border-0')}
-                      onClick={() => updateProgressMutation.mutate({ id: project.id, progress: p })}>{p}%</Button>
-                  ))}
-                </div>
+                <Button variant="outline" size="sm" className="mt-4 w-full gap-2" onClick={() => setFollowUpProject(project)}>
+                  <ListChecks className="h-4 w-4" />Manage Follow-up
+                </Button>
               </motion.div>
             ))}
           </motion.div>
         )}
+
+        <ProjectFollowUp
+          project={followUpProject}
+          open={!!followUpProject}
+          onOpenChange={(o) => !o && setFollowUpProject(null)}
+        />
       </div>
     </MainLayout>
   );
