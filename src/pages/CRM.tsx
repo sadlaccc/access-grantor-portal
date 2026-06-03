@@ -414,6 +414,11 @@ export default function CRM() {
                           <TableCell><Badge variant="outline" className="bg-muted/50">{lead.source || '—'}</Badge></TableCell>
                           <TableCell>
                             <div className="flex gap-1">
+                              {(isSales || isAdmin) && lead.stage !== 'qualified' && lead.stage !== 'closed-won' && (
+                                <Button size="sm" variant="outline" title="Convert to Deal" onClick={() => convertLeadMutation.mutate(lead)} disabled={convertLeadMutation.isPending}>
+                                  <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Convert
+                                </Button>
+                              )}
                               <Button size="sm" variant="ghost" onClick={() => openEditLead(lead)}><Pencil className="h-3.5 w-3.5" /></Button>
                               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteLeadMutation.mutate(lead)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>
