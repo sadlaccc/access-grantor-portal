@@ -134,7 +134,28 @@ export default function CRM() {
     onError: (error: Error) => toast.error('Failed: ' + error.message),
   });
 
-  const createDealMutation = useMutation({
+  const convertLeadMutation = useMutation({
+    mutationFn: async (lead: Lead) => {
+      const { error: dealErr } = await supabase.from('crm_deals').insert({
+        name: `${lead.company} Deal`, company: lead.company,
+        value: lead.estimated_value || 0, stage: 'proposal',
+        probability: 50, lead_id: lead.id, created_by: user?.id,
+      });
+      if (dealErr) throw dealErr;
+      const { error: leadErr } = await supabase.from('crm_leads')
+        .update({ stage: 'qualified' }).eq('id', lead.id);
+      if (leadErr) throw leadErr;
+      await notifyAllUsers({ title: 'Lead Converted', message: `${lead.company} converted to a deal`, type: 'update', app: 'crm', excludeUserId: user?.id });
+      await logAuditAction({ userId: user?.id!, action: 'convert', tableName: 'crm_leads', recordId: lead.id, recordSummary: `Converted lead: ${lead.company}` });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      toast.success('Lead converted to deal');
+    },
+    onError: (e: Error) => toast.error('Convert failed: ' + e.message),
+  });
+
     mutationFn: async () => {
       const { error } = await supabase.from('crm_deals').insert({
         name: dealName, company: dealCompany, value: parseFloat(dealValue) || 0,
