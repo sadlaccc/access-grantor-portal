@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileUpload } from '@/components/FileUpload';
 import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
+import { useDepartment } from '@/hooks/useDepartment';
+import { AlertTriangle } from 'lucide-react';
 
 interface Invoice {
   id: string;
