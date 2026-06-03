@@ -218,6 +218,12 @@ export default function Projects() {
             ))}
           </motion.div>
         )}
+
+        <ProjectFollowUp
+          project={followUpProject}
+          open={!!followUpProject}
+          onOpenChange={(o) => !o && setFollowUpProject(null)}
+        />
       </div>
     </MainLayout>
   );
