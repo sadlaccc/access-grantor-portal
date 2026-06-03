@@ -42,6 +42,7 @@ interface Order {
 
 const Inventory = () => {
   const { user } = useAuth();
+  const { isOps, isAdmin } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
