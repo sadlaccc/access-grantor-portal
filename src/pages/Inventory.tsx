@@ -680,6 +680,7 @@ const Inventory = () => {
                         <TableHead className="text-right">Current Qty</TableHead>
                         <TableHead className="text-right">Reorder Level</TableHead>
                         <TableHead className="text-right">Shortage</TableHead>
+                        {(isOps || isAdmin) && <TableHead className="text-right">Action</TableHead>}
                       </TableRow>
                     </TableHeader>
                     <TableBody>
@@ -690,6 +691,13 @@ const Inventory = () => {
                           <TableCell className="text-right text-destructive font-semibold">{product.quantity_in_stock}</TableCell>
                           <TableCell className="text-right">{product.reorder_level}</TableCell>
                           <TableCell className="text-right text-destructive">{product.reorder_level - product.quantity_in_stock}</TableCell>
+                          {(isOps || isAdmin) && (
+                            <TableCell className="text-right">
+                              <Button size="sm" variant="outline" onClick={() => reorderProductMutation.mutate(product)} disabled={reorderProductMutation.isPending}>
+                                <RefreshCw className="h-3 w-3 mr-1" />Reorder
+                              </Button>
+                            </TableCell>
+                          )}
                         </TableRow>
                       ))}
                     </TableBody>
