@@ -23,6 +23,8 @@ import { useToast } from '@/hooks/use-toast';
 import { useAuth } from '@/contexts/AuthContext';
 import { FileUpload } from '@/components/FileUpload';
 import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
+import { useDepartment } from '@/hooks/useDepartment';
+import { AlertTriangle } from 'lucide-react';
 
 interface Invoice {
   id: string;
@@ -62,6 +64,7 @@ interface Budget {
 
 const Finance = () => {
   const { user, isAdmin } = useAuth();
+  const { isFinance } = useDepartment();
   const { toast } = useToast();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
@@ -409,7 +412,12 @@ const Finance = () => {
                         <TableCell className="font-medium">{invoice.invoice_number}</TableCell>
                         <TableCell>{invoice.client_name}</TableCell>
                         <TableCell>{new Date(invoice.created_at).toLocaleDateString()}</TableCell>
-                        <TableCell>{new Date(invoice.due_date).toLocaleDateString()}</TableCell>
+                        <TableCell>
+                          {new Date(invoice.due_date).toLocaleDateString()}
+                          {invoice.status !== 'paid' && new Date(invoice.due_date) < new Date() && (
+                            <Badge variant="destructive" className="ml-2 text-xs"><AlertTriangle className="h-3 w-3 mr-1" />Overdue</Badge>
+                          )}
+                        </TableCell>
                         <TableCell className="text-right font-semibold">KES {invoice.total_amount.toLocaleString()}</TableCell>
                         <TableCell><Badge variant={invoice.status === 'paid' ? 'default' : invoice.status === 'sent' ? 'secondary' : invoice.status === 'overdue' ? 'destructive' : 'outline'}>{invoice.status}</Badge></TableCell>
                         <TableCell>
@@ -423,6 +431,11 @@ const Finance = () => {
                             )}
                             {invoice.status === 'sent' && (
                               <Button size="sm" variant="outline" onClick={() => updateInvoiceStatusMutation.mutate({ invoiceId: invoice.id, status: 'paid' })}>Mark Paid</Button>
+                            )}
+                            {(isFinance || isAdmin) && invoice.status === 'sent' && new Date(invoice.due_date) < new Date() && (
+                              <Button size="sm" variant="ghost" className="text-destructive" title="Mark overdue" onClick={() => updateInvoiceStatusMutation.mutate({ invoiceId: invoice.id, status: 'overdue' })}>
+                                <AlertTriangle className="h-3 w-3" />
+                              </Button>
                             )}
                             <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteInvoiceMutation.mutate(invoice)}><Trash2 className="h-3 w-3" /></Button>
                           </div>

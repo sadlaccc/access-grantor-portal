@@ -20,6 +20,8 @@ import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
 import { notifyAllUsers, logAuditAction } from '@/hooks/useNotifications';
+import { useDepartment } from '@/hooks/useDepartment';
+import { ArrowRightLeft } from 'lucide-react';
 
 interface Lead {
   id: string; company: string; contact_name: string; email: string | null; phone: string | null;
@@ -43,6 +45,7 @@ const cardVariants = {
 
 export default function CRM() {
   const { user } = useAuth();
+  const { isSales, isAdmin } = useDepartment();
   const queryClient = useQueryClient();
   const [searchTerm, setSearchTerm] = useState('');
   const [isLeadDialogOpen, setIsLeadDialogOpen] = useState(false);
@@ -129,6 +132,28 @@ export default function CRM() {
       resetLeadForm();
     },
     onError: (error: Error) => toast.error('Failed: ' + error.message),
+  });
+
+  const convertLeadMutation = useMutation({
+    mutationFn: async (lead: Lead) => {
+      const { error: dealErr } = await supabase.from('crm_deals').insert({
+        name: `${lead.company} Deal`, company: lead.company,
+        value: lead.estimated_value || 0, stage: 'proposal',
+        probability: 50, lead_id: lead.id, created_by: user?.id,
+      });
+      if (dealErr) throw dealErr;
+      const { error: leadErr } = await supabase.from('crm_leads')
+        .update({ stage: 'qualified' }).eq('id', lead.id);
+      if (leadErr) throw leadErr;
+      await notifyAllUsers({ title: 'Lead Converted', message: `${lead.company} converted to a deal`, type: 'update', app: 'crm', excludeUserId: user?.id });
+      await logAuditAction({ userId: user?.id!, action: 'convert', tableName: 'crm_leads', recordId: lead.id, recordSummary: `Converted lead: ${lead.company}` });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ['crm-leads'] });
+      queryClient.invalidateQueries({ queryKey: ['crm-deals'] });
+      toast.success('Lead converted to deal');
+    },
+    onError: (e: Error) => toast.error('Convert failed: ' + e.message),
   });
 
   const createDealMutation = useMutation({
@@ -389,6 +414,11 @@ export default function CRM() {
                           <TableCell><Badge variant="outline" className="bg-muted/50">{lead.source || '—'}</Badge></TableCell>
                           <TableCell>
                             <div className="flex gap-1">
+                              {(isSales || isAdmin) && lead.stage !== 'qualified' && lead.stage !== 'closed-won' && (
+                                <Button size="sm" variant="outline" title="Convert to Deal" onClick={() => convertLeadMutation.mutate(lead)} disabled={convertLeadMutation.isPending}>
+                                  <ArrowRightLeft className="h-3.5 w-3.5 mr-1" />Convert
+                                </Button>
+                              )}
                               <Button size="sm" variant="ghost" onClick={() => openEditLead(lead)}><Pencil className="h-3.5 w-3.5" /></Button>
                               <Button size="sm" variant="ghost" className="text-destructive hover:text-destructive" onClick={() => deleteLeadMutation.mutate(lead)}><Trash2 className="h-3.5 w-3.5" /></Button>
                             </div>

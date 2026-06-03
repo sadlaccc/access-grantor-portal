@@ -1,7 +1,8 @@
 import { useState } from 'react';
 import { motion } from 'framer-motion';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
-import { Plus, Search, Loader2, Ticket, AlertCircle, Pencil } from 'lucide-react';
+import { Plus, Search, Loader2, Ticket, AlertCircle, Pencil, Zap, Clock } from 'lucide-react';
+import { useDepartment } from '@/hooks/useDepartment';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -61,6 +62,7 @@ const rowVariants = {
 
 export default function Helpdesk() {
   const { user } = useAuth();
+  const { isIT, isAdmin } = useDepartment();
   const queryClient = useQueryClient();
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<string | null>(null);
@@ -213,6 +215,29 @@ export default function Helpdesk() {
       toast.error('Failed to update ticket: ' + error.message);
     },
   });
+
+  const escalateTicketMutation = useMutation({
+    mutationFn: async (ticket: TicketType) => {
+      const next = ticket.priority === 'low' ? 'medium' : ticket.priority === 'medium' ? 'high' : 'critical';
+      const { error } = await supabase.from('tickets').update({ priority: next }).eq('id', ticket.id);
+      if (error) throw error;
+      return { ...ticket, next };
+    },
+    onSuccess: (data) => {
+      queryClient.invalidateQueries({ queryKey: ['tickets'] });
+      toast.success(`Escalated to ${data.next}`);
+    },
+    onError: (e: Error) => toast.error('Escalate failed: ' + e.message),
+  });
+
+  const slaHours: Record<string, number> = { critical: 4, high: 8, medium: 24, low: 72 };
+  const getSla = (ticket: TicketType) => {
+    if (ticket.status === 'resolved' || ticket.status === 'closed') return null;
+    const target = slaHours[ticket.priority] ?? 24;
+    const elapsedH = (Date.now() - new Date(ticket.created_at).getTime()) / 3_600_000;
+    const remaining = target - elapsedH;
+    return { remaining, breached: remaining < 0 };
+  };
 
   const resetForm = () => {
     setTitle('');
@@ -419,9 +444,21 @@ export default function Helpdesk() {
                       </Badge>
                     </td>
                     <td className="px-6 py-4">
-                      <Badge variant="outline" className={cn('capitalize text-xs', statusColors[ticket.status])}>
-                        {ticket.status.replace('-', ' ')}
-                      </Badge>
+                      <div className="flex flex-col gap-1">
+                        <Badge variant="outline" className={cn('capitalize text-xs w-fit', statusColors[ticket.status])}>
+                          {ticket.status.replace('-', ' ')}
+                        </Badge>
+                        {(() => {
+                          const sla = getSla(ticket);
+                          if (!sla) return null;
+                          return (
+                            <span className={cn('text-xs flex items-center gap-1', sla.breached ? 'text-destructive' : 'text-muted-foreground')}>
+                              <Clock className="h-3 w-3" />
+                              {sla.breached ? `SLA breached ${Math.abs(sla.remaining).toFixed(1)}h ago` : `${sla.remaining.toFixed(1)}h left`}
+                            </span>
+                          );
+                        })()}
+                      </div>
                     </td>
                     <td className="px-6 py-4">
                       <span className="text-sm text-card-foreground">{ticket.created_by ? profileMap[ticket.created_by] || 'Unknown' : '—'}</span>
@@ -434,6 +471,11 @@ export default function Helpdesk() {
                         <Button size="icon" variant="ghost" className="h-8 w-8" onClick={() => openEditDialog(ticket)}>
                           <Pencil className="h-3.5 w-3.5" />
                         </Button>
+                        {(isIT || isAdmin) && ticket.priority !== 'critical' && ticket.status !== 'closed' && ticket.status !== 'resolved' && (
+                          <Button size="icon" variant="ghost" className="h-8 w-8 text-warning" title="Escalate priority" onClick={() => escalateTicketMutation.mutate(ticket)} disabled={escalateTicketMutation.isPending}>
+                            <Zap className="h-3.5 w-3.5" />
+                          </Button>
+                        )}
                         <Select
                           value={ticket.status}
                           onValueChange={(newStatus) => updateTicketStatusMutation.mutate({ ticketId: ticket.id, status: newStatus, oldStatus: ticket.status })}
