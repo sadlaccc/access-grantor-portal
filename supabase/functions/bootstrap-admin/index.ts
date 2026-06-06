@@ -14,11 +14,31 @@ Deno.serve(async (req) => {
     const supabaseUrl = Deno.env.get("SUPABASE_URL")!;
     const supabaseServiceKey = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
+    // Credentials must come from secrets — never hardcoded
+    const email = Deno.env.get("BOOTSTRAP_ADMIN_EMAIL");
+    const password = Deno.env.get("BOOTSTRAP_ADMIN_PASSWORD");
+
+    if (!email || !password) {
+      return new Response(
+        JSON.stringify({
+          error:
+            "Bootstrap admin credentials are not configured. Set BOOTSTRAP_ADMIN_EMAIL and BOOTSTRAP_ADMIN_PASSWORD secrets.",
+        }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
+    if (password.length < 12) {
+      return new Response(
+        JSON.stringify({ error: "Bootstrap admin password must be at least 12 characters" }),
+        { status: 400, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+      );
+    }
+
     const adminClient = createClient(supabaseUrl, supabaseServiceKey, {
       auth: { autoRefreshToken: false, persistSession: false },
     });
 
-    // Check if any admin exists
     const { data: existingAdmins, error: checkError } = await adminClient
       .from("user_roles")
       .select("user_id")
@@ -26,8 +46,8 @@ Deno.serve(async (req) => {
       .limit(1);
 
     if (checkError) {
-      console.error("Error checking for admins:", checkError.message);
-      return new Response(JSON.stringify({ error: checkError.message }), {
+      console.error("bootstrap-admin: failed admin check");
+      return new Response(JSON.stringify({ error: "Internal error" }), {
         status: 500,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -40,10 +60,6 @@ Deno.serve(async (req) => {
       });
     }
 
-    // Create the admin user
-    const email = "admin@intellinks.co.ke";
-    const password = "Admin123!";
-
     const { data: newUser, error: createError } = await adminClient.auth.admin.createUser({
       email,
       password,
@@ -52,45 +68,28 @@ Deno.serve(async (req) => {
     });
 
     if (createError) {
-      console.error("Error creating admin:", createError.message);
-      return new Response(JSON.stringify({ error: createError.message }), {
+      console.error("bootstrap-admin: create user failed");
+      return new Response(JSON.stringify({ error: "Failed to create admin" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    // The profile and user role are created by the trigger, but we need to upgrade to admin
     if (newUser.user) {
-      // Update the role to admin
-      const { error: roleError } = await adminClient
-        .from("user_roles")
-        .update({ role: "admin" })
-        .eq("user_id", newUser.user.id);
-
-      if (roleError) {
-        console.error("Error setting admin role:", roleError.message);
-      }
-
-      // Update profile with department
+      await adminClient.from("user_roles").update({ role: "admin" }).eq("user_id", newUser.user.id);
       await adminClient
         .from("profiles")
         .update({ department: "Administration", job_title: "System Administrator" })
         .eq("id", newUser.user.id);
     }
 
-    console.log("Admin user created successfully");
-    return new Response(JSON.stringify({ 
-      success: true, 
-      message: "Admin user created",
-      credentials: { email, password }
-    }), {
-      status: 200,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Bootstrap admin error:", message);
-    return new Response(JSON.stringify({ error: message }), {
+    return new Response(
+      JSON.stringify({ success: true, message: "Admin user created. Use configured credentials to sign in." }),
+      { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } }
+    );
+  } catch (_error) {
+    console.error("bootstrap-admin: unexpected failure");
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });

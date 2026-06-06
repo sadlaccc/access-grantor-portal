@@ -1,4 +1,5 @@
 // AI Chat edge function for Intellinks East Africa
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -6,17 +7,53 @@ const corsHeaders = {
 };
 
 Deno.serve(async (req) => {
-  // Handle CORS preflight
   if (req.method === 'OPTIONS') {
     return new Response(null, { headers: corsHeaders });
   }
 
   try {
+    // Require authenticated caller
+    const authHeader = req.headers.get('Authorization');
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    const supabaseUrl = Deno.env.get('SUPABASE_URL')!;
+    const supabaseAnonKey = Deno.env.get('SUPABASE_ANON_KEY')!;
+    const supabase = createClient(supabaseUrl, supabaseAnonKey, {
+      global: { headers: { Authorization: authHeader } },
+    });
+
+    const { data: { user }, error: authError } = await supabase.auth.getUser();
+    if (authError || !user) {
+      return new Response(
+        JSON.stringify({ error: 'Unauthorized' }),
+        { status: 401, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
+    // Optional: only users with ai_enabled may call
+    const { data: profile } = await supabase
+      .from('profiles')
+      .select('ai_enabled, full_name')
+      .eq('id', user.id)
+      .single();
+
+    if (profile && profile.ai_enabled === false) {
+      return new Response(
+        JSON.stringify({ error: 'AI assistant not enabled for this user' }),
+        { status: 403, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
+      );
+    }
+
     const { message, userName } = await req.json();
 
-    if (!message) {
+    if (!message || typeof message !== 'string' || message.length > 4000) {
       return new Response(
-        JSON.stringify({ error: 'Message is required' }),
+        JSON.stringify({ error: 'Invalid message' }),
         { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
       );
     }
@@ -26,6 +63,7 @@ Deno.serve(async (req) => {
       throw new Error('LOVABLE_API_KEY not configured');
     }
 
+    const displayName = userName || profile?.full_name || 'User';
     const systemPrompt = `You are an intelligent AI assistant for Intellinks East Africa, an enterprise IT management platform. You help employees with:
 
 1. **IT Support**: Answer questions about common IT issues, troubleshooting steps, and best practices.
@@ -38,7 +76,7 @@ Guidelines:
 - If you don't know something specific to the company, suggest contacting the IT helpdesk
 - For technical issues, provide step-by-step guidance when possible
 - Keep responses helpful but brief
-- Use the user's name (${userName || 'User'}) occasionally to personalize responses`;
+- Use the user's name (${displayName}) occasionally to personalize responses`;
 
     const response = await fetch('https://ai.gateway.lovable.dev/v1/chat/completions', {
       method: 'POST',
@@ -58,9 +96,8 @@ Guidelines:
     });
 
     if (!response.ok) {
-      const errorText = await response.text();
-      console.error('AI Gateway error:', errorText);
-      throw new Error(`AI Gateway error: ${response.status}`);
+      console.error('AI Gateway error status:', response.status);
+      throw new Error('AI service unavailable');
     }
 
     const data = await response.json();
@@ -70,11 +107,10 @@ Guidelines:
       JSON.stringify({ response: aiResponse }),
       { headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
-  } catch (error: unknown) {
-    console.error('Error in ai-chat function:', error);
-    const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+  } catch (_error) {
+    console.error('ai-chat: request failed');
     return new Response(
-      JSON.stringify({ error: 'Failed to process request', details: errorMessage }),
+      JSON.stringify({ error: 'Failed to process request' }),
       { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } }
     );
   }
