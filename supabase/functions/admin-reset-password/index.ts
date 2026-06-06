@@ -13,8 +13,7 @@ Deno.serve(async (req) => {
   try {
     const authHeader = req.headers.get("Authorization");
     if (!authHeader) {
-      console.log("Missing authorization header");
-      return new Response(JSON.stringify({ error: "Missing authorization header" }), {
+      return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
@@ -32,7 +31,6 @@ Deno.serve(async (req) => {
     // Verify the requesting user is authenticated
     const { data: { user: requestingUser }, error: authError } = await userClient.auth.getUser();
     if (authError || !requestingUser) {
-      console.log("Auth error:", authError?.message);
       return new Response(JSON.stringify({ error: "Unauthorized" }), {
         status: 401,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -48,7 +46,6 @@ Deno.serve(async (req) => {
       .single();
 
     if (roleError || !roleData) {
-      console.log("Admin check failed:", roleError?.message);
       return new Response(JSON.stringify({ error: "Admin access required" }), {
         status: 403,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
@@ -83,22 +80,20 @@ Deno.serve(async (req) => {
     });
 
     if (updateError) {
-      console.log("Password update error:", updateError.message);
-      return new Response(JSON.stringify({ error: updateError.message }), {
+      console.error("admin-reset-password: update failed");
+      return new Response(JSON.stringify({ error: "Failed to update password" }), {
         status: 400,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       });
     }
 
-    console.log("Password reset successful for user:", user_id);
     return new Response(JSON.stringify({ success: true }), {
       status: 200,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
-  } catch (error) {
-    const message = error instanceof Error ? error.message : "Unknown error";
-    console.error("Password reset error:", message);
-    return new Response(JSON.stringify({ error: message }), {
+  } catch (_error) {
+    console.error("admin-reset-password: unexpected failure");
+    return new Response(JSON.stringify({ error: "Internal error" }), {
       status: 500,
       headers: { ...corsHeaders, "Content-Type": "application/json" },
     });
