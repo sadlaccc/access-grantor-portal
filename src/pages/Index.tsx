@@ -96,84 +96,109 @@ const Index = () => {
         {/* Welcome */}
         <WelcomeGreeting />
 
-        {/* Stats */}
-        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
-          <StatsCard title="Open Tickets" value={ticketCount} icon={Ticket} index={0} />
-          <StatsCard title="Active Projects" value={projectCount} icon={FolderKanban} index={1} />
-          <StatsCard title="Available Assets" value={assetCount} icon={Monitor} index={2} />
-          <StatsCard title="Team Members" value={userCount} icon={Users} index={3} />
+        {/* Bento Grid */}
+        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 auto-rows-[minmax(140px,auto)] gap-4">
+          {/* Stats — small tiles */}
+          <div className="lg:col-span-1"><StatsCard title="Open Tickets" value={ticketCount} icon={Ticket} index={0} /></div>
+          <div className="lg:col-span-1"><StatsCard title="Active Projects" value={projectCount} icon={FolderKanban} index={1} /></div>
+          <div className="lg:col-span-1"><StatsCard title="Available Assets" value={assetCount} icon={Monitor} index={2} /></div>
+          <div className="lg:col-span-1"><StatsCard title="Team Members" value={userCount} icon={Users} index={3} /></div>
+
+          {/* Quick Actions — wide */}
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
+            <div className="h-full rounded-2xl border border-border bg-card card-elevated p-1">
+              <QuickActionsPanel />
+            </div>
+          </div>
+
+          {/* Notifications — tall */}
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
+            <div className="h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
+              <NotificationsWidget />
+            </div>
+          </div>
+
+          {/* Recent tickets — wide */}
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
+            <div className="h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
+              <RecentTickets />
+            </div>
+          </div>
+
+          {/* Active Projects — tall accent */}
+          {activeProjects.length > 0 && (
+            <motion.div
+              initial={{ opacity: 0, y: 12 }}
+              animate={{ opacity: 1, y: 0 }}
+              transition={{ delay: 0.4, duration: 0.4 }}
+              className="sm:col-span-2 lg:col-span-2 lg:row-span-2 rounded-2xl border border-border bg-gradient-to-br from-card to-secondary/40 card-elevated overflow-hidden"
+            >
+              <div className="border-b border-border px-6 py-4 flex items-center justify-between">
+                <h3 className="font-display text-sm font-semibold tracking-wide uppercase text-card-foreground">Active Projects</h3>
+                <span className="text-xs text-muted-foreground">{activeProjects.length} live</span>
+              </div>
+              <div className="divide-y divide-border">
+                {activeProjects.map((project) => (
+                  <div key={project.id} className="px-6 py-4 hover:bg-muted/30 transition-colors">
+                    <div className="flex items-center justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="font-medium text-card-foreground truncate">{project.name}</p>
+                        <p className="text-xs text-muted-foreground mt-0.5 truncate">{project.description || 'No description'}</p>
+                      </div>
+                      <span className="text-xl font-bold font-display text-gradient shrink-0">{project.progress}%</span>
+                    </div>
+                    <div className="mt-2.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                      <motion.div
+                        initial={{ width: 0 }}
+                        animate={{ width: `${project.progress}%` }}
+                        transition={{ duration: 1, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
+                        className="h-full rounded-full gradient-primary"
+                      />
+                    </div>
+                  </div>
+                ))}
+              </div>
+            </motion.div>
+          )}
         </div>
 
-        {/* Quick Actions */}
-        <QuickActionsPanel />
-
-        {/* Apps Grid */}
+        {/* Apps — bento sub-grid with varied tile sizes */}
         <div>
-          <motion.h2
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             transition={{ delay: 0.3 }}
-            className="mb-4 font-display text-lg font-semibold text-foreground"
+            className="mb-4 flex items-end justify-between"
           >
-            Your Applications
-          </motion.h2>
+            <div>
+              <h2 className="font-display text-2xl font-bold tracking-tight text-foreground">Your Applications</h2>
+              <p className="text-sm text-muted-foreground mt-1">Jump into any module</p>
+            </div>
+            <span className="text-xs font-medium text-accent uppercase tracking-wider">{apps.length} apps</span>
+          </motion.div>
           {apps.length === 0 ? (
             <div className="rounded-2xl border border-dashed border-border bg-card/50 p-12 text-center">
               <p className="text-muted-foreground">No apps assigned yet. Contact your administrator.</p>
             </div>
           ) : (
-            <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-4 gap-4">
               {apps.map((app, index) => (
-                <AppCard key={app.id} app={app} index={index} />
+                <div
+                  key={app.id}
+                  className={
+                    index === 0
+                      ? 'sm:col-span-2 lg:col-span-2 lg:row-span-2'
+                      : index === 3
+                      ? 'lg:col-span-2'
+                      : ''
+                  }
+                >
+                  <AppCard app={app} index={index} />
+                </div>
               ))}
             </div>
           )}
         </div>
-
-        {/* Recent Activity & Notifications */}
-        <div className="grid gap-6 lg:grid-cols-3">
-          <div className="lg:col-span-2">
-            <RecentTickets />
-          </div>
-          <div>
-            <NotificationsWidget />
-          </div>
-        </div>
-
-        {/* Active Projects */}
-        {activeProjects.length > 0 && (
-          <motion.div
-            initial={{ opacity: 0, y: 12 }}
-            animate={{ opacity: 1, y: 0 }}
-            transition={{ delay: 0.5, duration: 0.4 }}
-            className="rounded-2xl border border-border bg-card card-elevated overflow-hidden"
-          >
-            <div className="border-b border-border px-6 py-4">
-              <h3 className="font-display text-sm font-semibold text-card-foreground">Active Projects</h3>
-            </div>
-            <div className="divide-y divide-border">
-              {activeProjects.map((project) => (
-                <div key={project.id} className="px-6 py-5 hover:bg-muted/30 transition-colors">
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-medium text-card-foreground">{project.name}</p>
-                      <p className="text-sm text-muted-foreground mt-0.5">{project.description || 'No description'}</p>
-                    </div>
-                    <span className="text-2xl font-bold font-display text-gradient">{project.progress}%</span>
-                  </div>
-                  <div className="mt-3 h-1.5 overflow-hidden rounded-full bg-muted">
-                    <motion.div
-                      initial={{ width: 0 }}
-                      animate={{ width: `${project.progress}%` }}
-                      transition={{ duration: 1, delay: 0.6, ease: [0.22, 1, 0.36, 1] }}
-                      className="h-full rounded-full gradient-primary"
-                    />
-                  </div>
-                </div>
-              ))}
-            </div>
-          </motion.div>
-        )}
       </div>
     </MainLayout>
   );

@@ -32,10 +32,11 @@ export function AppCard({ app, index }: AppCardProps) {
       initial={{ opacity: 0, y: 16 }}
       animate={{ opacity: 1, y: 0 }}
       transition={{ duration: 0.45, delay: index * 0.06, ease: [0.22, 1, 0.36, 1] }}
+      className="h-full"
     >
       <Link
         to={app.route}
-        className="group relative flex flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 card-interactive"
+        className="group relative flex h-full flex-col overflow-hidden rounded-2xl border border-border bg-card p-6 card-interactive"
       >
         {/* Hover gradient overlay */}
         <div className="absolute inset-0 opacity-0 group-hover:opacity-100 transition-opacity duration-500 bg-gradient-to-br from-primary/[0.04] via-transparent to-accent/[0.02] pointer-events-none" />
