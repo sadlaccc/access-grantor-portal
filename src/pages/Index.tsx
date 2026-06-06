@@ -110,12 +110,12 @@ const Index = () => {
           </div>
 
           {/* Notifications — tall */}
-          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full">
             <NotificationsWidget />
           </div>
 
           {/* Recent tickets — wide */}
-          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full">
             <RecentTickets />
           </div>
 
