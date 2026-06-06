@@ -105,24 +105,18 @@ const Index = () => {
           <div className="lg:col-span-1"><StatsCard title="Team Members" value={userCount} icon={Users} index={3} /></div>
 
           {/* Quick Actions — wide */}
-          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
-            <div className="h-full rounded-2xl border border-border bg-card card-elevated p-1">
-              <QuickActionsPanel />
-            </div>
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full">
+            <QuickActionsPanel />
           </div>
 
           {/* Notifications — tall */}
-          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
-            <div className="h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
-              <NotificationsWidget />
-            </div>
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full">
+            <NotificationsWidget />
           </div>
 
           {/* Recent tickets — wide */}
-          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2">
-            <div className="h-full rounded-2xl border border-border bg-card card-elevated overflow-hidden">
-              <RecentTickets />
-            </div>
+          <div className="sm:col-span-2 lg:col-span-2 lg:row-span-2 h-full">
+            <RecentTickets />
           </div>
 
           {/* Active Projects — tall accent */}

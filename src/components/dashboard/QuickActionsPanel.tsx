@@ -54,7 +54,7 @@ export function QuickActionsPanel() {
         <div className="h-2 w-2 rounded-full bg-primary animate-float" />
         <h3 className="font-display text-sm font-semibold text-card-foreground">Quick Actions</h3>
       </div>
-      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3 lg:grid-cols-6">
+      <div className="grid grid-cols-2 gap-2 p-3 sm:grid-cols-3">
         {quickActions.map((action, i) => {
           const Icon = action.icon;
           return (
@@ -67,13 +67,15 @@ export function QuickActionsPanel() {
               <Button
                 variant="ghost"
                 className={cn(
-                  'flex h-auto w-full flex-col items-center gap-2 rounded-xl p-4 transition-all duration-200',
+                  'flex h-auto min-h-[84px] w-full flex-col items-center justify-center gap-2 rounded-xl px-2 py-3 transition-all duration-200',
                   action.color
                 )}
                 onClick={action.action}
               >
-                <Icon className={cn('h-5 w-5', action.iconColor)} />
-                <span className="text-xs font-medium text-card-foreground">{action.label}</span>
+                <Icon className={cn('h-5 w-5 shrink-0', action.iconColor)} />
+                <span className="text-xs font-medium text-card-foreground text-center leading-tight break-words whitespace-normal max-w-full">
+                  {action.label}
+                </span>
               </Button>
             </motion.div>
           );
