@@ -121,6 +121,16 @@ export function Sidebar({ onNavigate }: SidebarProps) {
               <NavItem to="/admin" icon={Settings} label="User Management" active={location.pathname === '/admin'} collapsed={collapsed && !onNavigate} onClick={handleNavClick} />
             </>
           )}
+
+          <AnimatePresence>
+            {(!collapsed || onNavigate) && (
+              <motion.div initial={{ opacity: 0, height: 0 }} animate={{ opacity: 1, height: 'auto' }} exit={{ opacity: 0, height: 0 }} className="px-3 pb-1 pt-5">
+                <span className="text-[10px] font-semibold uppercase tracking-[0.1em] text-sidebar-muted">Preferences</span>
+              </motion.div>
+            )}
+          </AnimatePresence>
+          {collapsed && !onNavigate && <div className="my-3 mx-2 h-px bg-white/[0.06]" />}
+          <NavItem to="/settings" icon={Settings} label="App Settings" active={location.pathname === '/settings'} collapsed={collapsed && !onNavigate} onClick={handleNavClick} />
         </nav>
 
         {/* User */}
