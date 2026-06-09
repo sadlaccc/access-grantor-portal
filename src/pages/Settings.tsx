@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings, ACCENT_PRESETS, type Density } from '@/hooks/useAppSettings';
 import { cn } from '@/lib/utils';
+import techSettings from '@/assets/tech-settings.jpg';
 
 const densityOptions: { id: Density; label: string; desc: string }[] = [
   { id: 'compact', label: 'Compact', desc: 'More on screen, tighter spacing' },
@@ -24,9 +25,17 @@ export default function Settings() {
         <motion.div
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
-          className="flex items-center justify-between"
+          className="relative overflow-hidden rounded-3xl border border-border bg-gradient-to-br from-card via-card to-primary/5 p-8"
         >
-          <div>
+          <img
+            src={techSettings}
+            alt=""
+            aria-hidden="true"
+            loading="lazy"
+            className="pointer-events-none absolute -right-10 -top-10 h-64 w-64 object-contain opacity-60 dark:opacity-30"
+          />
+          <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-card via-card/90 to-transparent" />
+          <div className="relative">
             <div className="inline-flex items-center gap-2 rounded-full bg-primary/10 px-3 py-1 text-xs font-medium text-primary mb-3">
               <Sparkles className="h-3 w-3" />
               App Settings

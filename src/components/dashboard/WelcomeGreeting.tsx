@@ -2,6 +2,8 @@ import { useEffect, useState } from 'react';
 import { motion } from 'framer-motion';
 import { Sparkles, Sun, Moon, CloudSun, Calendar } from 'lucide-react';
 import { useAuth } from '@/contexts/AuthContext';
+import techBanner from '@/assets/tech-banner.jpg';
+
 
 const getGreeting = () => {
   const hour = new Date().getHours();
@@ -38,6 +40,15 @@ export function WelcomeGreeting() {
       className="relative overflow-hidden rounded-2xl gradient-primary p-8 text-primary-foreground"
       style={{ boxShadow: '0 8px 32px -8px hsl(199 89% 48% / 0.3)' }}
     >
+      {/* Tech background image */}
+      <img
+        src={techBanner}
+        alt=""
+        aria-hidden="true"
+        className="pointer-events-none absolute inset-0 h-full w-full object-cover opacity-30 mix-blend-screen"
+      />
+      <div className="pointer-events-none absolute inset-0 bg-gradient-to-r from-primary/80 via-primary/40 to-transparent" />
+
       {/* Background decorations */}
       <div className="absolute -right-12 -top-12 h-48 w-48 rounded-full bg-white/[0.08] blur-3xl" />
       <div className="absolute -bottom-8 -left-8 h-36 w-36 rounded-full bg-white/[0.04] blur-2xl" />
