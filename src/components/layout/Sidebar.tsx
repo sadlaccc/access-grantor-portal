@@ -4,14 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Headphones, FolderKanban, Monitor, Users, BarChart3,
   BookOpen, Settings, ChevronRight, LogOut, UserCog, Handshake,
-  MessageCircle, Package, DollarSign, Loader2,
+  MessageCircle, Package, DollarSign, Loader2, Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import intellinksLogo from '@/assets/intellinks-logo.png';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Headphones, FolderKanban, Monitor, Users, BarChart3, BookOpen,
