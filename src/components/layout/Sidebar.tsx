@@ -4,14 +4,14 @@ import { motion, AnimatePresence } from 'framer-motion';
 import {
   LayoutDashboard, Headphones, FolderKanban, Monitor, Users, BarChart3,
   BookOpen, Settings, ChevronRight, LogOut, UserCog, Handshake,
-  MessageCircle, Package, DollarSign, Loader2,
+  MessageCircle, Package, DollarSign, Loader2, Building2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { Button } from '@/components/ui/button';
 import { useAuth } from '@/contexts/AuthContext';
 import { useApps } from '@/hooks/useApps';
+import { useAppSettings } from '@/hooks/useAppSettings';
 import { ThemeToggle } from '@/components/ThemeToggle';
-import intellinksLogo from '@/assets/intellinks-logo.png';
 
 const iconMap: Record<string, React.ComponentType<{ className?: string }>> = {
   Headphones, FolderKanban, Monitor, Users, BarChart3, BookOpen,
@@ -32,11 +32,15 @@ export function Sidebar({ onNavigate }: SidebarProps) {
   const location = useLocation();
   const { user, profile, isAdmin, signOut, loading: authLoading } = useAuth();
   const { data: apps = [], isLoading: appsLoading } = useApps();
+  const { companyName, companyLogo } = useAppSettings();
 
   const handleSignOut = async () => { await signOut(); };
 
   const userInitials = profile?.full_name
     ?.split(' ').map((n) => n[0]).join('') || user?.email?.[0]?.toUpperCase() || '?';
+
+  const brandInitials = companyName
+    .split(' ').filter(Boolean).slice(0, 2).map((w) => w[0]).join('').toUpperCase() || 'CO';
 
   const isLoading = authLoading || appsLoading;
 
@@ -57,12 +61,23 @@ export function Sidebar({ onNavigate }: SidebarProps) {
         <div className="flex h-16 items-center justify-between px-4 border-b border-white/[0.06]">
           <AnimatePresence mode="wait">
             {!collapsed || onNavigate ? (
-              <motion.div key="full-logo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5">
-                <img src={intellinksLogo} alt="Intellinks EA" className="h-8 w-auto" />
+              <motion.div key="full-logo" initial={{ opacity: 0 }} animate={{ opacity: 1 }} exit={{ opacity: 0 }} className="flex items-center gap-2.5 min-w-0">
+                {companyLogo ? (
+                  <img src={companyLogo} alt={companyName} className="h-8 w-8 rounded-lg object-contain bg-white/[0.06] p-1" />
+                ) : (
+                  <div className="flex h-8 w-8 items-center justify-center rounded-lg gradient-primary shadow-glow">
+                    <Building2 className="h-4 w-4 text-primary-foreground" />
+                  </div>
+                )}
+                <span className="truncate text-sm font-semibold text-sidebar-foreground">{companyName}</span>
               </motion.div>
             ) : (
-              <motion.div key="mini-logo" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow">
-                <span className="text-primary-foreground font-bold text-xs">IE</span>
+              <motion.div key="mini-logo" initial={{ scale: 0.8, opacity: 0 }} animate={{ scale: 1, opacity: 1 }} exit={{ scale: 0.8, opacity: 0 }} className="flex h-9 w-9 items-center justify-center rounded-xl gradient-primary shadow-glow overflow-hidden">
+                {companyLogo ? (
+                  <img src={companyLogo} alt={companyName} className="h-full w-full object-contain" />
+                ) : (
+                  <span className="text-primary-foreground font-bold text-xs">{brandInitials}</span>
+                )}
               </motion.div>
             )}
           </AnimatePresence>

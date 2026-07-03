@@ -1,11 +1,15 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Moon, Sun, Monitor, Palette, Type, LayoutGrid, Sparkles } from 'lucide-react';
+import { Check, Moon, Sun, Monitor, Palette, Type, LayoutGrid, Sparkles, Building2, Upload, Trash2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings, ACCENT_PRESETS, type Density } from '@/hooks/useAppSettings';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import techSettings from '@/assets/tech-settings.jpg';
 
 const densityOptions: { id: Density; label: string; desc: string }[] = [
@@ -16,7 +20,31 @@ const densityOptions: { id: Density; label: string; desc: string }[] = [
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { accent, setAccent, density, setDensity } = useAppSettings();
+  const {
+    accent, setAccent,
+    density, setDensity,
+    companyName, setCompanyName,
+    companyTagline, setCompanyTagline,
+    companyLogo, setCompanyLogo,
+  } = useAppSettings();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      toast.error('Logo must be under 512 KB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCompanyLogo(reader.result as string);
+      toast.success('Logo updated');
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <MainLayout>
@@ -49,7 +77,73 @@ export default function Settings() {
           </div>
         </motion.div>
 
+        {/* Branding */}
+        <SettingsSection
+          icon={Building2}
+          title="Branding"
+          description="Set your company name and logo — they appear on the sign-in page and across the app."
+        >
+          <Card className="p-6 space-y-6">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-6">
+              <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-2 border-dashed border-border bg-muted/30 overflow-hidden">
+                {companyLogo ? (
+                  <img src={companyLogo} alt="Company logo" className="h-full w-full object-contain p-2" />
+                ) : (
+                  <Building2 className="h-8 w-8 text-muted-foreground" />
+                )}
+              </div>
+              <div className="flex-1 space-y-2">
+                <p className="text-sm font-medium text-foreground">Company logo</p>
+                <p className="text-xs text-muted-foreground">PNG, JPG or SVG. Recommended square, under 512 KB.</p>
+                <div className="flex gap-2 pt-1">
+                  <input
+                    ref={fileRef}
+                    type="file"
+                    accept="image/*"
+                    className="hidden"
+                    onChange={(e) => {
+                      const f = e.target.files?.[0];
+                      if (f) handleLogoUpload(f);
+                      e.target.value = '';
+                    }}
+                  />
+                  <Button variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+                    <Upload className="h-4 w-4 mr-2" /> Upload
+                  </Button>
+                  {companyLogo && (
+                    <Button variant="ghost" size="sm" onClick={() => { setCompanyLogo(null); toast.success('Logo removed'); }}>
+                      <Trash2 className="h-4 w-4 mr-2" /> Remove
+                    </Button>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+              <div className="space-y-2">
+                <Label htmlFor="company-name">Company name</Label>
+                <Input
+                  id="company-name"
+                  value={companyName}
+                  onChange={(e) => setCompanyName(e.target.value)}
+                  placeholder="Your Company"
+                />
+              </div>
+              <div className="space-y-2">
+                <Label htmlFor="company-tagline">Tagline</Label>
+                <Input
+                  id="company-tagline"
+                  value={companyTagline}
+                  onChange={(e) => setCompanyTagline(e.target.value)}
+                  placeholder="Enterprise Portal"
+                />
+              </div>
+            </div>
+          </Card>
+        </SettingsSection>
+
         {/* Theme */}
+
         <SettingsSection
           icon={Sun}
           title="Theme"
