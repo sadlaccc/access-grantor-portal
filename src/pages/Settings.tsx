@@ -1,11 +1,15 @@
+import { useRef } from 'react';
 import { motion } from 'framer-motion';
-import { Check, Moon, Sun, Monitor, Palette, Type, LayoutGrid, Sparkles } from 'lucide-react';
+import { Check, Moon, Sun, Monitor, Palette, Type, LayoutGrid, Sparkles, Building2, Upload, Trash2 } from 'lucide-react';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Card } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { useTheme } from '@/hooks/useTheme';
 import { useAppSettings, ACCENT_PRESETS, type Density } from '@/hooks/useAppSettings';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 import techSettings from '@/assets/tech-settings.jpg';
 
 const densityOptions: { id: Density; label: string; desc: string }[] = [
@@ -16,7 +20,31 @@ const densityOptions: { id: Density; label: string; desc: string }[] = [
 
 export default function Settings() {
   const { theme, setTheme } = useTheme();
-  const { accent, setAccent, density, setDensity } = useAppSettings();
+  const {
+    accent, setAccent,
+    density, setDensity,
+    companyName, setCompanyName,
+    companyTagline, setCompanyTagline,
+    companyLogo, setCompanyLogo,
+  } = useAppSettings();
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const handleLogoUpload = (file: File) => {
+    if (!file.type.startsWith('image/')) {
+      toast.error('Please choose an image file.');
+      return;
+    }
+    if (file.size > 512 * 1024) {
+      toast.error('Logo must be under 512 KB.');
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => {
+      setCompanyLogo(reader.result as string);
+      toast.success('Logo updated');
+    };
+    reader.readAsDataURL(file);
+  };
 
   return (
     <MainLayout>
