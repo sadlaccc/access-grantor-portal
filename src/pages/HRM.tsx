@@ -999,6 +999,11 @@ export default function HRM() {
               </CardContent>
             </Card>
           </TabsContent>
+
+          {/* Meetings Tab */}
+          <TabsContent value="meetings">
+            <MeetingsSection profiles={profiles} profileMap={profileMap} isHROrAdmin={isHROrAdmin} />
+          </TabsContent>
         </Tabs>
 
         {/* Edit Employee Dialog */}
