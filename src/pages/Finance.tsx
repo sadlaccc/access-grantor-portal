@@ -304,6 +304,7 @@ const Finance = () => {
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="payments">Payments</TabsTrigger>
               <TabsTrigger value="budgets">Budgets</TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
