@@ -17,8 +17,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Users, Calendar, Clock, Award, Search, Plus, GraduationCap, Loader2,
   Briefcase, Pencil, Megaphone, Trash2, Bell, Send, ClipboardCheck,
-  Star, UserPlus, CheckCircle2, LogIn, LogOut,
+  Star, UserPlus, CheckCircle2, LogIn, LogOut, CalendarClock,
 } from 'lucide-react';
+import { MeetingsSection } from '@/components/hrm/MeetingsSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
