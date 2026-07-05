@@ -600,6 +600,7 @@ export default function HRM() {
             <TabsTrigger value="training" className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /><span className="hidden sm:inline">Training</span></TabsTrigger>
             {isHROrAdmin && <TabsTrigger value="reviews" className="flex items-center gap-2"><Star className="h-4 w-4" /><span className="hidden sm:inline">Reviews</span></TabsTrigger>}
             <TabsTrigger value="onboarding" className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">Onboarding</span></TabsTrigger>
+            <TabsTrigger value="meetings" className="flex items-center gap-2"><CalendarClock className="h-4 w-4" /><span className="hidden sm:inline">Meetings</span></TabsTrigger>
           </TabsList>
 
           {/* Employees Tab */}
