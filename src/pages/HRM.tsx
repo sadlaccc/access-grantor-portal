@@ -17,8 +17,9 @@ import { Checkbox } from '@/components/ui/checkbox';
 import {
   Users, Calendar, Clock, Award, Search, Plus, GraduationCap, Loader2,
   Briefcase, Pencil, Megaphone, Trash2, Bell, Send, ClipboardCheck,
-  Star, UserPlus, CheckCircle2, LogIn, LogOut,
+  Star, UserPlus, CheckCircle2, LogIn, LogOut, CalendarClock,
 } from 'lucide-react';
+import { MeetingsSection } from '@/components/hrm/MeetingsSection';
 import { supabase } from '@/integrations/supabase/client';
 import { useAuth } from '@/contexts/AuthContext';
 import { toast } from 'sonner';
@@ -599,6 +600,7 @@ export default function HRM() {
             <TabsTrigger value="training" className="flex items-center gap-2"><GraduationCap className="h-4 w-4" /><span className="hidden sm:inline">Training</span></TabsTrigger>
             {isHROrAdmin && <TabsTrigger value="reviews" className="flex items-center gap-2"><Star className="h-4 w-4" /><span className="hidden sm:inline">Reviews</span></TabsTrigger>}
             <TabsTrigger value="onboarding" className="flex items-center gap-2"><ClipboardCheck className="h-4 w-4" /><span className="hidden sm:inline">Onboarding</span></TabsTrigger>
+            <TabsTrigger value="meetings" className="flex items-center gap-2"><CalendarClock className="h-4 w-4" /><span className="hidden sm:inline">Meetings</span></TabsTrigger>
           </TabsList>
 
           {/* Employees Tab */}
@@ -996,6 +998,11 @@ export default function HRM() {
                 )}
               </CardContent>
             </Card>
+          </TabsContent>
+
+          {/* Meetings Tab */}
+          <TabsContent value="meetings">
+            <MeetingsSection profiles={profiles} profileMap={profileMap} isHROrAdmin={isHROrAdmin} />
           </TabsContent>
         </Tabs>
 

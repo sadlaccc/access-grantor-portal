@@ -4,9 +4,10 @@ import { DatePicker } from '@/components/ui/date-picker';
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query';
 import { 
   DollarSign, Plus, Search, FileText, Receipt, PiggyBank, 
-  TrendingUp, TrendingDown, Loader2, Download, Send, FileDown, Trash2
+  TrendingUp, TrendingDown, Loader2, Download, Send, FileDown, Trash2, Wallet
 } from 'lucide-react';
 import { generateInvoicePdf, generateExpenseReportPdf } from '@/lib/generateInvoicePdf';
+import { PaymentsSection } from '@/components/finance/PaymentsSection';
 import { MainLayout } from '@/components/layout/MainLayout';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -303,6 +304,7 @@ const Finance = () => {
             <TabsList>
               <TabsTrigger value="invoices">Invoices</TabsTrigger>
               <TabsTrigger value="expenses">Expenses</TabsTrigger>
+              <TabsTrigger value="payments">Payments</TabsTrigger>
               <TabsTrigger value="budgets">Budgets</TabsTrigger>
             </TabsList>
             <div className="flex gap-2">
@@ -486,6 +488,10 @@ const Finance = () => {
                 </Table>
               </CardContent>
             </Card>
+          </TabsContent>
+
+          <TabsContent value="payments">
+            <PaymentsSection />
           </TabsContent>
 
           <TabsContent value="budgets">

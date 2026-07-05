@@ -834,6 +834,80 @@ export type Database = {
         }
         Relationships: []
       }
+      meeting_participants: {
+        Row: {
+          created_at: string
+          id: string
+          meeting_id: string
+          response: string
+          user_id: string
+        }
+        Insert: {
+          created_at?: string
+          id?: string
+          meeting_id: string
+          response?: string
+          user_id: string
+        }
+        Update: {
+          created_at?: string
+          id?: string
+          meeting_id?: string
+          response?: string
+          user_id?: string
+        }
+        Relationships: [
+          {
+            foreignKeyName: "meeting_participants_meeting_id_fkey"
+            columns: ["meeting_id"]
+            isOneToOne: false
+            referencedRelation: "meetings"
+            referencedColumns: ["id"]
+          },
+        ]
+      }
+      meetings: {
+        Row: {
+          agenda: string | null
+          created_at: string
+          duration_minutes: number
+          id: string
+          location: string | null
+          meeting_link: string | null
+          organizer_id: string
+          scheduled_at: string
+          status: string
+          title: string
+          updated_at: string
+        }
+        Insert: {
+          agenda?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          organizer_id: string
+          scheduled_at: string
+          status?: string
+          title: string
+          updated_at?: string
+        }
+        Update: {
+          agenda?: string | null
+          created_at?: string
+          duration_minutes?: number
+          id?: string
+          location?: string | null
+          meeting_link?: string | null
+          organizer_id?: string
+          scheduled_at?: string
+          status?: string
+          title?: string
+          updated_at?: string
+        }
+        Relationships: []
+      }
       notifications: {
         Row: {
           app: string | null
@@ -906,6 +980,66 @@ export type Database = {
           id?: string
           is_completed?: boolean | null
           title?: string
+        }
+        Relationships: []
+      }
+      payments: {
+        Row: {
+          amount: number
+          category: string | null
+          created_at: string
+          created_by: string | null
+          currency: string
+          id: string
+          method: string
+          notes: string | null
+          payee_name: string
+          payee_type: string
+          payee_user_id: string | null
+          payment_date: string
+          payment_number: string
+          reference: string | null
+          status: string
+          supplier_contact: string | null
+          updated_at: string
+        }
+        Insert: {
+          amount: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          payee_name: string
+          payee_type: string
+          payee_user_id?: string | null
+          payment_date?: string
+          payment_number: string
+          reference?: string | null
+          status?: string
+          supplier_contact?: string | null
+          updated_at?: string
+        }
+        Update: {
+          amount?: number
+          category?: string | null
+          created_at?: string
+          created_by?: string | null
+          currency?: string
+          id?: string
+          method?: string
+          notes?: string | null
+          payee_name?: string
+          payee_type?: string
+          payee_user_id?: string | null
+          payment_date?: string
+          payment_number?: string
+          reference?: string | null
+          status?: string
+          supplier_contact?: string | null
+          updated_at?: string
         }
         Relationships: []
       }
