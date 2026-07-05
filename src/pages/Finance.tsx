@@ -490,6 +490,10 @@ const Finance = () => {
             </Card>
           </TabsContent>
 
+          <TabsContent value="payments">
+            <PaymentsSection />
+          </TabsContent>
+
           <TabsContent value="budgets">
             <Card><CardHeader><CardTitle>Budgets</CardTitle></CardHeader>
               <CardContent>
